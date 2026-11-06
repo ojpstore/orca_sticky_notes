@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { COLORS, formatDate, newNote, persistable, visibleNotes } from './notes.js'
+import { COLORS, formatDate, newNote, persistable, visibleNotes, withDefaults } from './notes.js'
 
 const note = (text, updatedAt = 0) => ({ ...newNote(updatedAt), text })
 
@@ -19,6 +19,19 @@ test('검색은 대소문자를 구분하지 않고 최근 수정순으로 정�
   assert.deepEqual(visibleNotes(notes, ' ALPHA ').map((n) => n.updatedAt), [3, 1])
   assert.deepEqual(visibleNotes(notes, '').map((n) => n.updatedAt), [3, 2, 1])
   assert.deepEqual(visibleNotes(notes, '없음'), [])
+})
+
+test('제목만 있어도 저장하고 검색된다', () => {
+  const titled = { ...note(''), title: '장보기' }
+  assert.deepEqual(persistable([titled, { ...note(''), title: '  ' }]), [titled])
+  assert.deepEqual(visibleNotes([titled, note('다른 내용')], '장보기'), [titled])
+})
+
+test('제목 없이 저장된 기존 메모도 읽을 수 있다', () => {
+  const [old] = withDefaults([{ id: 'a', html: 'x', text: 'x', color: 'blue', updatedAt: 1 }])
+  assert.equal(old.title, '')
+  assert.deepEqual(persistable([old]), [old])
+  assert.equal(withDefaults([{ ...old, title: '유지' }])[0].title, '유지')
 })
 
 test('검색이 원본 배열 순서를 바꾸지 않는다', () => {

@@ -61,6 +61,8 @@
       .card:hover { background: var(--orca-accent); }
       .date { text-align: right; font-size: 11px; color: var(--c); }
       html.light .date { color: color-mix(in srgb, var(--c) 55%, black); }
+      .card-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .preview:empty { display: none; }
       .preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; }
       .empty { margin: 24px 0; text-align: center; color: var(--orca-muted-foreground); }
 
@@ -73,6 +75,20 @@
       #confirm { gap: 8px; padding: 6px 12px; font-size: 13px; background: var(--orca-card); }
       #confirm button { padding: 2px 10px; border-radius: 3px; background: var(--orca-secondary); color: var(--orca-secondary-foreground); }
       #confirm #confirm-yes { background: var(--orca-destructive); color: var(--orca-destructive-foreground); }
+      #title {
+        flex: none;
+        width: 100%;
+        padding: 8px 12px 6px;
+        font: inherit;
+        font-size: 16px;
+        font-weight: 600;
+        color: inherit;
+        background: none;
+        border: 0;
+        border-bottom: 1px solid var(--orca-border);
+        outline: none;
+      }
+      #title::placeholder { color: var(--orca-muted-foreground); font-weight: 400; }
       #editor { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 12px; outline: none; overflow-wrap: anywhere; }
       #editor:empty::before { content: attr(data-placeholder); color: var(--orca-muted-foreground); }
       #format { border-top: 1px solid var(--orca-border); }
@@ -122,6 +138,7 @@
         <button id="confirm-yes">삭제</button>
         <button id="confirm-no">취소</button>
       </div>
+      <input id="title" type="text" placeholder="제목" aria-label="메모 제목" autocomplete="off" />
       <div id="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="메모 내용" data-placeholder="메모 입력..."></div>
       <div id="format" class="bar">
         <button class="icon" data-command="bold" aria-label="굵게" aria-pressed="false" title="굵게 (Ctrl+B)"><b>B</b></button>
@@ -135,10 +152,11 @@
     </section>
 
     <script type="module">
-      import { COLORS, formatDate, newNote, persistable, visibleNotes } from './notes.js'
+      import { COLORS, formatDate, newNote, persistable, visibleNotes, withDefaults } from './notes.js'
 
       const $ = (id) => document.getElementById(id)
       const editor = $('editor')
+      const title = $('title')
       const SAVE_DELAY_MS = 300
       const RETRY_DELAY_MS = 3000
 
@@ -185,7 +203,7 @@
         element.className = 'card'
         element.tabIndex = 0
         element.setAttribute('role', 'button')
-        element.setAttribute('aria-label', note.text.slice(0, 80))
+        element.setAttribute('aria-label', (note.title || note.text).slice(0, 80))
         element.style.setProperty('--c', COLORS[note.color])
 
         const date = document.createElement('div')
@@ -196,7 +214,14 @@
         preview.className = 'preview'
         preview.innerHTML = note.html // 붙여넣기와 끌어놓기를 일반 텍스트로 제한해서 편집기 서식만 들어 있다.
 
-        element.append(date, preview)
+        element.append(date)
+        if (note.title.trim()) {
+          const heading = document.createElement('div')
+          heading.className = 'card-title'
+          heading.textContent = note.title
+          element.append(heading)
+        }
+        element.append(preview)
         element.addEventListener('click', () => openNote(note))
         element.addEventListener('keydown', (event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return
@@ -233,13 +258,16 @@
 
       function openNote(note) {
         current = note
+        title.value = note.title
         editor.innerHTML = note.html
         togglePalette(false)
         $('confirm').hidden = true
         renderSwatches()
         $('list').hidden = true
         $('note').hidden = false
-        editor.focus()
+        // 새 메모는 제목부터, 기존 메모는 본문부터 입력한다.
+        if (persistable([note]).length) editor.focus()
+        else title.focus()
       }
 
       function closeNote() {
@@ -269,7 +297,7 @@
             orca.storage.get('notes'),
             orca.storage.get('confirmDelete')
           ])
-          notes = Array.isArray(stored) ? stored : []
+          notes = Array.isArray(stored) ? withDefaults(stored) : []
           confirmDelete = confirmSetting ?? true
           loaded = true
           $('add').disabled = false
@@ -314,12 +342,23 @@
       $('back').addEventListener('click', closeNote)
       $('palette').addEventListener('click', () => togglePalette($('swatches').hidden))
       $('delete').addEventListener('click', () => {
-        if (confirmDelete && current.text.trim()) $('confirm').hidden = false
+        if (confirmDelete && persistable([current]).length) $('confirm').hidden = false
         else deleteCurrent()
       })
       $('confirm-yes').addEventListener('click', deleteCurrent)
       $('confirm-no').addEventListener('click', () => {
         $('confirm').hidden = true
+      })
+
+      title.addEventListener('input', () => {
+        current.title = title.value
+        current.updatedAt = Date.now()
+        scheduleSave()
+      })
+      title.addEventListener('keydown', (event) => {
+        if (event.isComposing) return // 한글 조합을 확정하는 Enter로 본문으로 넘어가지 않게 한다.
+        if (event.key === 'Enter') editor.focus()
+        if (event.key === 'Escape') closeNote()
       })
 
       editor.addEventListener('input', () => {
@@ -351,10 +390,13 @@
         if (current) syncFormatButtons()
       })
 
-      // 패널이 닫힐 때 대기 중인 저장을 놓치지 않는다.
-      addEventListener('pagehide', flush)
+      // 패널이 닫힐 때 대기 중인 저장만 마친다. 변경이 없으면 쓰지 않아야 다른 곳의 저장을 덮어쓰지 않는다.
+      const flushPending = () => {
+        if (saveTimer !== null) flush()
+      }
+      addEventListener('pagehide', flushPending)
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden) flush()
+        if (document.hidden) flushPending()
       })
 
       void load()

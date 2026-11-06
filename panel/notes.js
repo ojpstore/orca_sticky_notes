@@ -13,19 +13,23 @@ export const COLORS = {
 // crypto.randomUUID는 보안 컨텍스트가 필요해서 샌드박스 프레임에서 보장되지 않는다.
 export const newNote = (now = Date.now()) => ({
   id: `${now.toString(36)}-${Math.random().toString(36).slice(2)}`,
+  title: '',
   html: '',
   text: '',
   color: 'yellow',
   updatedAt: now
 })
 
-// Windows 스티커 메모처럼 내용 없는 메모는 남기지 않는다.
-export const persistable = (notes) => notes.filter((note) => note.text.trim())
+// 제목 기능이 생기기 전에 저장된 메모에는 title이 없다.
+export const withDefaults = (stored) => stored.map((note) => ({ title: '', ...note }))
+
+// Windows 스티커 메모처럼 제목도 내용도 없는 메모는 남기지 않는다.
+export const persistable = (notes) => notes.filter((note) => note.title.trim() || note.text.trim())
 
 export function visibleNotes(notes, query) {
   const needle = query.trim().toLocaleLowerCase()
   return notes
-    .filter((note) => note.text.toLocaleLowerCase().includes(needle))
+    .filter((note) => `${note.title}\n${note.text}`.toLocaleLowerCase().includes(needle))
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
