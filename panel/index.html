@@ -69,6 +69,7 @@
       .card-title[aria-expanded]::before { content: '▸'; display: inline-block; width: 14px; color: var(--orca-muted-foreground); }
       .card-title[aria-expanded='true']::before { content: '▾'; }
       .card-pin { flex: none; width: 13px; height: 13px; margin-right: auto; color: var(--c); }
+      .card-title .card-pin { display: inline-block; margin-right: 5px; vertical-align: -2px; }
       .date { flex: none; font-size: 11px; color: var(--orca-muted-foreground); }
       .apply {
         flex: none;
@@ -339,7 +340,7 @@
           pin.classList.add('card-pin')
           pin.setAttribute('role', 'img')
           pin.setAttribute('aria-label', '고정됨')
-          top.prepend(pin)
+          ;(top.querySelector('.card-title') ?? top).prepend(pin) // 제목 안에 넣어야 접기 아이콘이 맨 앞에 온다.
         }
         body.append(preview)
         onActivate(body, () => openNote(note))
