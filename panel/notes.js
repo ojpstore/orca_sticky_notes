@@ -17,11 +17,14 @@ export const newNote = (now = Date.now()) => ({
   html: '',
   text: '',
   color: 'yellow',
+  pinned: false,
+  createdAt: now,
   updatedAt: now
 })
 
-// 제목 기능이 생기기 전에 저장된 메모에는 title이 없다.
-export const withDefaults = (stored) => stored.map((note) => ({ title: '', ...note }))
+// 이전 버전이 저장한 메모에는 없는 필드를 채운다. 작성일자는 기록된 적이 없어서 수정 시각으로 대신한다.
+export const withDefaults = (stored) =>
+  stored.map((note) => ({ title: '', pinned: false, createdAt: note.updatedAt, ...note }))
 
 // Windows 스티커 메모처럼 제목도 내용도 없는 메모는 남기지 않는다.
 export const persistable = (notes) => notes.filter((note) => note.title.trim() || note.text.trim())
@@ -37,7 +40,13 @@ export function visibleNotes(notes, query, scope = 'all') {
   const field = SEARCH_FIELDS[scope]
   return notes
     .filter((note) => field(note).toLocaleLowerCase().includes(needle))
-    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .sort(byPinThenDate)
+}
+
+// 고정 메모가 항상 위에 오고 그 안에서는 작성일자 최신순, 나머지는 수정일자 최신순이다.
+function byPinThenDate(a, b) {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+  return a.pinned ? b.createdAt - a.createdAt : b.updatedAt - a.updatedAt
 }
 
 // 오늘은 시각, 올해는 월·일, 그 이전은 연도까지 표시한다.

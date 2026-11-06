@@ -37,9 +37,27 @@ test('조회 조건에 따라 제목 또는 내용에서만 찾는다', () => {
   assert.equal(visibleNotes(notes, '', 'title').length, 2)
 })
 
+test('고정 메모는 항상 위에 있고 작성일자 최신순으로 정렬된다', () => {
+  const pin = (id, createdAt, updatedAt) => ({ ...note(id, updatedAt), id, pinned: true, createdAt })
+  const notes = [
+    { ...note('일반 최신', 100), id: 'normal-new' },
+    pin('old-pin', 1, 90),
+    { ...note('일반 과거', 50), id: 'normal-old' },
+    pin('new-pin', 2, 10)
+  ]
+  assert.deepEqual(visibleNotes(notes, '').map((n) => n.id), ['new-pin', 'old-pin', 'normal-new', 'normal-old'])
+})
+
+test('검색 결과에서도 고정 메모가 위에 있다', () => {
+  const notes = [{ ...note('회의', 9), id: 'a' }, { ...note('회의', 1), id: 'b', pinned: true }, { ...note('기타', 1), id: 'c', pinned: true }]
+  assert.deepEqual(visibleNotes(notes, '회의').map((n) => n.id), ['b', 'a'])
+})
+
 test('제목 없이 저장된 기존 메모도 읽을 수 있다', () => {
   const [old] = withDefaults([{ id: 'a', html: 'x', text: 'x', color: 'blue', updatedAt: 1 }])
   assert.equal(old.title, '')
+  assert.equal(old.pinned, false)
+  assert.equal(old.createdAt, 1)
   assert.deepEqual(persistable([old]), [old])
   assert.equal(withDefaults([{ ...old, title: '유지' }])[0].title, '유지')
 })
