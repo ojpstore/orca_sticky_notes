@@ -52,6 +52,8 @@
       .search input::-webkit-search-cancel-button { display: none; }
       .search svg { position: absolute; top: 7px; right: 8px; color: var(--orca-muted-foreground); pointer-events: none; }
 
+      .list-tools { justify-content: flex-end; gap: 2px; margin: -6px 12px 4px; }
+
       .cards { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
       .card {
         flex: none;
@@ -160,6 +162,14 @@
           <input id="query" type="search" placeholder="검색..." aria-label="메모 검색" />
           <svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" /></svg>
         </div>
+      </div>
+      <div class="bar list-tools">
+        <button id="collapse-all" class="icon" aria-label="전체 접기" title="전체 접기">
+          <svg viewBox="0 0 20 20"><path d="m6 3 4 4 4-4M6 17l4-4 4 4" /></svg>
+        </button>
+        <button id="expand-all" class="icon" aria-label="전체 펼치기" title="전체 펼치기">
+          <svg viewBox="0 0 20 20"><path d="m6 7 4-4 4 4M6 13l4 4 4-4" /></svg>
+        </button>
       </div>
       <div id="cards" class="cards"></div>
       <p id="status" class="status" role="status" hidden></p>
@@ -484,6 +494,14 @@
       $('confirm-setting').addEventListener('change', (event) => {
         confirmDelete = event.target.checked
         orca.storage.set('confirmDelete', confirmDelete).catch(() => showError('설정을 저장하지 못했습니다.'))
+      })
+      $('collapse-all').addEventListener('click', () => {
+        expanded.clear()
+        renderList()
+      })
+      $('expand-all').addEventListener('click', () => {
+        for (const note of notes) expanded.add(note.id)
+        renderList()
       })
       $('query').addEventListener('input', renderList)
       $('scope').addEventListener('change', renderList)
