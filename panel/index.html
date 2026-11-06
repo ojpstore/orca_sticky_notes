@@ -263,6 +263,9 @@
         <button class="icon" data-command="insertUnorderedList" aria-label="글머리 기호" aria-pressed="false" title="글머리 기호">
           <svg viewBox="0 0 20 20"><path d="M8 5h9M8 10h9M8 15h9M3.5 5h.01M3.5 10h.01M3.5 15h.01" stroke-width="2" /></svg>
         </button>
+        <button id="format-emoji" class="icon" aria-label="이모지" title="이모지" aria-expanded="false">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" /><path d="M7 12c.7 1 1.7 1.5 3 1.5s2.300-.5 3-1.5M7.500 8h.01M12.500 8h.01" /></svg>
+        </button>
       </div>
     </section>
 
@@ -608,11 +611,21 @@
         }
       }
 
-      function toggleEmojis(open) {
+      // 선택창은 하나를 제목과 본문이 함께 쓴다. 본문은 선택창을 열면 포커스를 잃으므로 커서 위치를 기억해 둔다.
+      let emojiTarget = title
+      let editorRange = null
+
+      function toggleEmojis(open, target = title) {
         $('emojis').hidden = !open
-        $('emoji').setAttribute('aria-expanded', String(open))
+        $('emoji').setAttribute('aria-expanded', String(open && target === title))
+        $('format-emoji').setAttribute('aria-expanded', String(open && target === editor))
         $('tones').classList.remove('open')
         if (!open) return
+        emojiTarget = target
+        if (target === editor) {
+          const range = getSelection().rangeCount ? getSelection().getRangeAt(0) : null
+          editorRange = range && editor.contains(range.commonAncestorContainer) ? range.cloneRange() : null
+        }
         if (!emojiSections.length) buildEmojis()
         renderRecentEmojis()
         showEmojiPreview()
@@ -715,12 +728,25 @@
       $('emoji-sections').addEventListener('click', (event) => {
         const emoji = event.target.closest('button')?.textContent
         if (!emoji) return
-        title.setRangeText(emoji, title.selectionStart, title.selectionEnd, 'end')
-        title.dispatchEvent(new Event('input')) // 저장은 직접 입력과 같은 경로를 탄다.
+        if (emojiTarget === editor) {
+          editor.focus()
+          const selection = getSelection()
+          if (!editorRange) {
+            editorRange = document.createRange()
+            editorRange.selectNodeContents(editor)
+            editorRange.collapse(false) // 커서를 둔 적이 없으면 끝에 넣는다.
+          }
+          selection.removeAllRanges()
+          selection.addRange(editorRange)
+          document.execCommand('insertText', false, emoji) // input 이벤트가 발생해 저장된다.
+        } else {
+          title.setRangeText(emoji, title.selectionStart, title.selectionEnd, 'end')
+          title.dispatchEvent(new Event('input')) // 저장은 직접 입력과 같은 경로를 탄다.
+        }
         recentEmojis = pushRecent(recentEmojis, emoji)
         orca.storage.set('recentEmojis', recentEmojis).catch(() => showError('설정을 저장하지 못했습니다.'))
         toggleEmojis(false)
-        title.focus()
+        emojiTarget.focus()
       })
       for (const name of ['mouseover', 'focusin']) {
         $('emoji-sections').addEventListener(name, (event) => showEmojiPreview(event.target.closest('button')))
@@ -732,7 +758,7 @@
         if (event.isComposing || event.key !== 'Escape') return
         event.preventDefault()
         toggleEmojis(false)
-        title.focus()
+        emojiTarget.focus()
       })
 
       for (const id of ['add', 'backup', 'import']) $(id).disabled = true
@@ -783,7 +809,9 @@
         scheduleSave()
       })
       $('palette').addEventListener('click', () => togglePalette($('swatches').hidden))
-      $('emoji').addEventListener('click', () => toggleEmojis($('emojis').hidden))
+      $('emoji').addEventListener('click', () => toggleEmojis($('emojis').hidden || emojiTarget !== title, title))
+      $('format-emoji').addEventListener('mousedown', (event) => event.preventDefault()) // 편집기 선택 영역 유지
+      $('format-emoji').addEventListener('click', () => toggleEmojis($('emojis').hidden || emojiTarget !== editor, editor))
       $('delete').addEventListener('click', () => {
         if (confirmDelete && persistable([current]).length) $('confirm').hidden = false
         else deleteCurrent()
