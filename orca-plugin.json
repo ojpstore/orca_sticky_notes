@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 2,
+  "id": "sticky-notes",
+  "name": "스티커 메모",
+  "version": "0.1.0",
+  "description": "Windows 스티커 메모처럼 Orca 사이드바에서 메모를 쓰고 검색합니다.",
+  "engines": {
+    "orca": ">=1.4.246"
+  },
+  "execution": "sandboxed-ui",
+  "pluginApi": 1,
+  "contributes": {
+    "panels": [
+      {
+        "id": "sticky-notes",
+        "title": "스티커 메모",
+        "icon": "edit",
+        "entry": "panel/index.html"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "storage:own"
+    }
+  ]
+}

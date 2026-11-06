@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>스티커 메모</title>
+    <style>
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        font: 14px/1.5 'Segoe UI', 'Malgun Gothic', system-ui, sans-serif;
+        color: var(--orca-foreground);
+        background: var(--orca-background);
+      }
+      button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+      :focus-visible { outline: 2px solid var(--orca-ring); outline-offset: -2px; }
+      svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+      .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .bar { display: flex; align-items: center; flex: none; }
+      .spacer { flex: 1; }
+      .icon { width: 38px; height: 38px; display: grid; place-items: center; }
+      .icon:hover, .icon[aria-expanded='true'], .icon[aria-pressed='true'] { background: var(--orca-accent); color: var(--orca-accent-foreground); }
+
+      .banner { flex: none; margin: 0; padding: 6px 12px; font-size: 12px; color: var(--orca-destructive-foreground); background: var(--orca-destructive); }
+      .banner button { text-decoration: underline; }
+
+      h1 { margin: 0 12px 10px; font-size: 20px; font-weight: 700; }
+      .settings { margin: 0 12px 10px; padding: 8px 10px; font-size: 13px; background: var(--orca-card); border-radius: 4px; }
+      .settings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+      .search { position: relative; flex: none; margin: 0 12px 12px; }
+      .search input {
+        width: 100%;
+        height: 32px;
+        padding: 0 34px 0 12px;
+        font: inherit;
+        color: inherit;
+        background: var(--orca-muted);
+        border: 0;
+        border-bottom: 1px solid var(--orca-input);
+        border-radius: 3px;
+      }
+      .search input::placeholder { color: var(--orca-muted-foreground); }
+      .search input::-webkit-search-cancel-button { display: none; }
+      .search svg { position: absolute; top: 7px; right: 9px; color: var(--orca-muted-foreground); pointer-events: none; }
+
+      .cards { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+      .card {
+        flex: none;
+        padding: 4px 12px 12px;
+        background: var(--orca-card);
+        color: var(--orca-card-foreground);
+        border-top: 3px solid var(--c);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .card:hover { background: var(--orca-accent); }
+      .date { text-align: right; font-size: 11px; color: var(--c); }
+      html.light .date { color: color-mix(in srgb, var(--c) 55%, black); }
+      .preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; }
+      .empty { margin: 24px 0; text-align: center; color: var(--orca-muted-foreground); }
+
+      .preview ul, #editor ul { margin: 0; padding-left: 1.3em; }
+
+      #note { border-top: 3px solid var(--c); }
+      #swatches { gap: 6px; padding: 6px 12px; }
+      .swatch { width: 24px; height: 24px; padding: 0; background: var(--c); border-radius: 50%; }
+      .swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--orca-background), 0 0 0 4px var(--orca-foreground); }
+      #confirm { gap: 8px; padding: 6px 12px; font-size: 13px; background: var(--orca-card); }
+      #confirm button { padding: 2px 10px; border-radius: 3px; background: var(--orca-secondary); color: var(--orca-secondary-foreground); }
+      #confirm #confirm-yes { background: var(--orca-destructive); color: var(--orca-destructive-foreground); }
+      #editor { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 12px; outline: none; overflow-wrap: anywhere; }
+      #editor:empty::before { content: attr(data-placeholder); color: var(--orca-muted-foreground); }
+      #format { border-top: 1px solid var(--orca-border); }
+      #format .icon { font-size: 15px; }
+    </style>
+  </head>
+  <body>
+    <p id="error" class="banner" role="alert" hidden></p>
+
+    <section id="list" class="view">
+      <div class="bar">
+        <button id="add" class="icon" aria-label="새 메모" title="새 메모">
+          <svg viewBox="0 0 20 20"><path d="M10 3v14M3 10h14" /></svg>
+        </button>
+        <span class="spacer"></span>
+        <button id="gear" class="icon" aria-label="설정" title="설정" aria-expanded="false">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-2.8 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.9l.1-.1a1.7 1.7 0 0 0-1.2-2.8H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.9-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+        </button>
+      </div>
+      <h1>스티커 메모</h1>
+      <div id="settings" class="settings" hidden>
+        <label><input id="confirm-setting" type="checkbox" /> 삭제하기 전에 확인</label>
+      </div>
+      <div class="search">
+        <input id="query" type="search" placeholder="검색..." aria-label="메모 검색" />
+        <svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" /></svg>
+      </div>
+      <div id="cards" class="cards"></div>
+    </section>
+
+    <section id="note" class="view" hidden>
+      <div class="bar">
+        <button id="back" class="icon" aria-label="메모 목록" title="메모 목록">
+          <svg viewBox="0 0 20 20"><path d="M16 10H4m5-5-5 5 5 5" /></svg>
+        </button>
+        <span class="spacer"></span>
+        <button id="palette" class="icon" aria-label="색상" title="색상" aria-expanded="false">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" /><circle cx="10" cy="10" r="2.5" fill="currentColor" /></svg>
+        </button>
+        <button id="delete" class="icon" aria-label="메모 삭제" title="메모 삭제">
+          <svg viewBox="0 0 20 20"><path d="M3.5 5.5h13M8 5.5V3.5h4v2m-7 0 .8 11h8.4l.8-11M8.5 8.5v5m3-5v5" /></svg>
+        </button>
+      </div>
+      <div id="swatches" class="bar" hidden></div>
+      <div id="confirm" class="bar" hidden>
+        <span class="spacer">이 메모를 삭제할까요?</span>
+        <button id="confirm-yes">삭제</button>
+        <button id="confirm-no">취소</button>
+      </div>
+      <div id="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="메모 내용" data-placeholder="메모 입력..."></div>
+      <div id="format" class="bar">
+        <button class="icon" data-command="bold" aria-label="굵게" aria-pressed="false" title="굵게 (Ctrl+B)"><b>B</b></button>
+        <button class="icon" data-command="italic" aria-label="기울임꼴" aria-pressed="false" title="기울임꼴 (Ctrl+I)"><i>I</i></button>
+        <button class="icon" data-command="underline" aria-label="밑줄" aria-pressed="false" title="밑줄 (Ctrl+U)"><u>U</u></button>
+        <button class="icon" data-command="strikeThrough" aria-label="취소선" aria-pressed="false" title="취소선"><s>ab</s></button>
+        <button class="icon" data-command="insertUnorderedList" aria-label="글머리 기호" aria-pressed="false" title="글머리 기호">
+          <svg viewBox="0 0 20 20"><path d="M8 5h9M8 10h9M8 15h9M3.5 5h.01M3.5 10h.01M3.5 15h.01" stroke-width="2" /></svg>
+        </button>
+      </div>
+    </section>
+
+    <script type="module">
+      import { COLORS, formatDate, newNote, persistable, visibleNotes } from './notes.js'
+
+      const $ = (id) => document.getElementById(id)
+      const editor = $('editor')
+      const SAVE_DELAY_MS = 300
+      const RETRY_DELAY_MS = 3000
+
+      let notes = []
+      let current = null
+      let confirmDelete = true
+      let loaded = false // 불러오기 전에는 절대 저장하지 않는다. 빈 목록으로 덮어쓰면 메모가 사라진다.
+      let saveTimer = null
+      let writes = Promise.resolve()
+
+      function showError(message, retry) {
+        const banner = $('error')
+        banner.hidden = !message
+        banner.textContent = message ?? ''
+        if (!retry) return
+        const button = document.createElement('button')
+        button.textContent = '다시 시도'
+        button.addEventListener('click', retry)
+        banner.append(' ', button)
+      }
+
+      // ponytail: 전체 배열을 한 키에 저장하며 마지막 쓰기가 이긴다. 패널을 두 창에서 동시에 열면 메모별 키와 onDidChange 병합이 필요하다.
+      function flush() {
+        clearTimeout(saveTimer)
+        saveTimer = null
+        if (!loaded) return
+        const snapshot = persistable(notes)
+        writes = writes.then(() => orca.storage.set('notes', snapshot)).then(
+          () => showError(null),
+          () => {
+            showError('저장하지 못했습니다. 잠시 후 다시 시도합니다.')
+            scheduleSave(RETRY_DELAY_MS)
+          }
+        )
+      }
+
+      function scheduleSave(delay = SAVE_DELAY_MS) {
+        clearTimeout(saveTimer)
+        saveTimer = setTimeout(flush, delay)
+      }
+
+      function card(note) {
+        const element = document.createElement('div')
+        element.className = 'card'
+        element.tabIndex = 0
+        element.setAttribute('role', 'button')
+        element.setAttribute('aria-label', note.text.slice(0, 80))
+        element.style.setProperty('--c', COLORS[note.color])
+
+        const date = document.createElement('div')
+        date.className = 'date'
+        date.textContent = formatDate(note.updatedAt, orca.locale)
+
+        const preview = document.createElement('div')
+        preview.className = 'preview'
+        preview.innerHTML = note.html // 붙여넣기와 끌어놓기를 일반 텍스트로 제한해서 편집기 서식만 들어 있다.
+
+        element.append(date, preview)
+        element.addEventListener('click', () => openNote(note))
+        element.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          openNote(note)
+        })
+        return element
+      }
+
+      function renderList() {
+        const query = $('query').value
+        const shown = visibleNotes(notes, query)
+        if (shown.length) {
+          $('cards').replaceChildren(...shown.map(card))
+          return
+        }
+        const empty = document.createElement('p')
+        empty.className = 'empty'
+        empty.textContent = query.trim() ? '검색 결과가 없습니다.' : '메모가 없습니다. + 버튼으로 추가하세요.'
+        $('cards').replaceChildren(empty)
+      }
+
+      function renderSwatches() {
+        for (const swatch of $('swatches').children) {
+          swatch.setAttribute('aria-pressed', String(swatch.dataset.color === current.color))
+        }
+        $('note').style.setProperty('--c', COLORS[current.color])
+      }
+
+      function togglePalette(open) {
+        $('swatches').hidden = !open
+        $('palette').setAttribute('aria-expanded', String(open))
+      }
+
+      function openNote(note) {
+        current = note
+        editor.innerHTML = note.html
+        togglePalette(false)
+        $('confirm').hidden = true
+        renderSwatches()
+        $('list').hidden = true
+        $('note').hidden = false
+        editor.focus()
+      }
+
+      function closeNote() {
+        current = null
+        notes = persistable(notes)
+        flush()
+        renderList()
+        $('note').hidden = true
+        $('list').hidden = false
+      }
+
+      function deleteCurrent() {
+        notes = notes.filter((note) => note !== current)
+        closeNote()
+      }
+
+      function syncFormatButtons() {
+        for (const button of document.querySelectorAll('[data-command]')) {
+          button.setAttribute('aria-pressed', String(document.queryCommandState(button.dataset.command)))
+        }
+      }
+
+      async function load() {
+        showError(null)
+        try {
+          const [stored, confirmSetting] = await Promise.all([
+            orca.storage.get('notes'),
+            orca.storage.get('confirmDelete')
+          ])
+          notes = Array.isArray(stored) ? stored : []
+          confirmDelete = confirmSetting ?? true
+          loaded = true
+          $('add').disabled = false
+          $('confirm-setting').checked = confirmDelete
+          renderList()
+        } catch {
+          showError('메모를 불러오지 못했습니다.', load)
+        }
+      }
+
+      for (const [name, value] of Object.entries(COLORS)) {
+        const swatch = document.createElement('button')
+        swatch.className = 'swatch'
+        swatch.dataset.color = name
+        swatch.style.setProperty('--c', value)
+        swatch.setAttribute('aria-label', `색상 ${name}`)
+        swatch.addEventListener('click', () => {
+          current.color = name
+          renderSwatches()
+          scheduleSave()
+        })
+        $('swatches').append(swatch)
+      }
+
+      $('add').disabled = true
+      $('add').addEventListener('click', () => {
+        const note = newNote()
+        notes.push(note)
+        openNote(note)
+      })
+      $('gear').addEventListener('click', () => {
+        const open = $('settings').hidden
+        $('settings').hidden = !open
+        $('gear').setAttribute('aria-expanded', String(open))
+      })
+      $('confirm-setting').addEventListener('change', (event) => {
+        confirmDelete = event.target.checked
+        orca.storage.set('confirmDelete', confirmDelete).catch(() => showError('설정을 저장하지 못했습니다.'))
+      })
+      $('query').addEventListener('input', renderList)
+
+      $('back').addEventListener('click', closeNote)
+      $('palette').addEventListener('click', () => togglePalette($('swatches').hidden))
+      $('delete').addEventListener('click', () => {
+        if (confirmDelete && current.text.trim()) $('confirm').hidden = false
+        else deleteCurrent()
+      })
+      $('confirm-yes').addEventListener('click', deleteCurrent)
+      $('confirm-no').addEventListener('click', () => {
+        $('confirm').hidden = true
+      })
+
+      editor.addEventListener('input', () => {
+        // 내용을 모두 지워도 브라우저가 <br>을 남겨서 안내 문구가 보이지 않는다.
+        if (!editor.textContent && !editor.querySelector('li')) editor.innerHTML = ''
+        current.html = editor.innerHTML
+        current.text = editor.innerText
+        current.updatedAt = Date.now()
+        scheduleSave()
+      })
+      editor.addEventListener('paste', (event) => {
+        event.preventDefault()
+        document.execCommand('insertText', false, event.clipboardData.getData('text/plain'))
+      })
+      editor.addEventListener('drop', (event) => event.preventDefault())
+      editor.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeNote()
+      })
+
+      for (const button of document.querySelectorAll('[data-command]')) {
+        button.addEventListener('mousedown', (event) => event.preventDefault()) // 편집기 선택 영역 유지
+        button.addEventListener('click', () => {
+          editor.focus()
+          document.execCommand(button.dataset.command)
+          syncFormatButtons()
+        })
+      }
+      document.addEventListener('selectionchange', () => {
+        if (current) syncFormatButtons()
+      })
+
+      // 패널이 닫힐 때 대기 중인 저장을 놓치지 않는다.
+      addEventListener('pagehide', flush)
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) flush()
+      })
+
+      void load()
+    </script>
+  </body>
+</html>
