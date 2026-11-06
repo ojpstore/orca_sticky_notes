@@ -63,8 +63,8 @@
       }
       .card::before { content: ''; display: block; height: 2px; background: var(--c); }
       .card:has(.card-body:hover) { border-color: var(--orca-input); }
-      .card-top { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 34px; padding: 4px 8px 4px 12px; }
-      .card-title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .card-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 8px; min-height: 34px; padding: 4px 8px 4px 12px; }
+      .card-title { flex: 1 1 96px; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .card-pin { flex: none; width: 13px; height: 13px; margin-right: auto; color: var(--c); }
       .date { flex: none; font-size: 11px; color: var(--orca-muted-foreground); }
       .apply {

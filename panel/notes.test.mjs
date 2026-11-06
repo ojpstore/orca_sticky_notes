@@ -68,9 +68,7 @@ test('검색이 원본 배열 순서를 바꾸지 않는다', () => {
   assert.deepEqual(notes.map((n) => n.updatedAt), [1, 2])
 })
 
-test('날짜는 오늘/올해/작년을 구분해서 표시한다', () => {
-  const now = new Date(2026, 10, 6, 15, 30).getTime()
-  assert.match(formatDate(new Date(2026, 10, 6, 9, 5).getTime(), 'ko-KR', now), /9:05/)
-  assert.equal(formatDate(new Date(2026, 10, 5).getTime(), 'ko-KR', now), '11월 5일')
-  assert.equal(formatDate(new Date(2025, 10, 5).getTime(), 'ko-KR', now), '2025년 11월 5일')
+test('날짜는 항상 연월일과 시분을 표시한다', () => {
+  // 오전/AM 표기는 런타임의 ICU 데이터에 따라 달라서 검사하지 않는다.
+  assert.match(formatDate(new Date(2026, 10, 6, 9, 5).getTime(), 'ko-KR'), /^2026\. 11\. 6\. .+ 9:05$/)
 })

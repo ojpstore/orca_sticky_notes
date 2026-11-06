@@ -49,14 +49,11 @@ function byPinThenDate(a, b) {
   return a.pinned ? b.createdAt - a.createdAt : b.updatedAt - a.updatedAt
 }
 
-// 오늘은 시각, 올해는 월·일, 그 이전은 연도까지 표시한다.
-export function formatDate(timestamp, locale, now = Date.now()) {
-  const date = new Date(timestamp)
-  const today = new Date(now)
-  if (date.toDateString() === today.toDateString()) {
-    return date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
-  }
-  const options = { month: 'long', day: 'numeric' }
-  if (date.getFullYear() !== today.getFullYear()) options.year = 'numeric'
-  return date.toLocaleDateString(locale, options)
-}
+export const formatDate = (timestamp, locale) =>
+  new Date(timestamp).toLocaleString(locale, {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
