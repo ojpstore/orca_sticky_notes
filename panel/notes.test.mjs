@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { COLORS, formatDate, newNote, persistable, visibleNotes, withDefaults } from './notes.js'
+import { backupJson, COLORS, formatDate, mergeNotes, newNote, parseBackup, persistable, visibleNotes, withDefaults } from './notes.js'
 
 const note = (text, updatedAt = 0) => ({ ...newNote(updatedAt), text })
 
@@ -71,4 +71,29 @@ test('검색이 원본 배열 순서를 바꾸지 않는다', () => {
 test('날짜는 항상 연월일과 시분을 표시한다', () => {
   // 오전/AM 표기는 런타임의 ICU 데이터에 따라 달라서 검사하지 않는다.
   assert.match(formatDate(new Date(2026, 10, 6, 9, 5).getTime(), 'ko-KR'), /^2026\. 11\. 6\. .+ 9:05$/)
+})
+
+test('백업을 다시 읽으면 빈 메모를 뺀 같은 메모가 나온다', () => {
+  const kept = { ...note('내용', 5), title: '제목', pinned: true }
+  assert.deepEqual(parseBackup(backupJson([kept, note('')])), [kept])
+})
+
+test('형식이 틀린 백업은 전체를 거부한다', () => {
+  const good = note('내용')
+  const file = (notes) => JSON.stringify({ notes })
+  assert.throws(() => parseBackup('메모 아님'))
+  assert.throws(() => parseBackup('null'))
+  assert.throws(() => parseBackup('{}'))
+  assert.throws(() => parseBackup(file([good, null])))
+  assert.throws(() => parseBackup(file([{ ...good, title: 1 }])))
+  assert.throws(() => parseBackup(file([{ ...good, color: 'constructor' }])))
+  assert.throws(() => parseBackup(file([{ ...good, updatedAt: '1' }])))
+})
+
+test('가져오기는 기존 메모를 지우지 않고 같은 id는 최근 수정본만 남긴다', () => {
+  const at = (id, updatedAt) => ({ ...note(id, updatedAt), id })
+  const notes = [at('only-mine', 1), at('mine-newer', 9), at('file-newer', 1)]
+  const merged = mergeNotes(notes, [at('mine-newer', 2), at('file-newer', 9), at('only-file', 1)])
+  assert.deepEqual(merged.map((n) => [n.id, n.updatedAt]), [['only-mine', 1], ['mine-newer', 9], ['file-newer', 9], ['only-file', 1]])
+  assert.equal(merged.filter((n) => !notes.includes(n)).length, 2)
 })

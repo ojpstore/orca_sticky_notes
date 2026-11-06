@@ -2,7 +2,10 @@ import { execFile } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-// 메모를 터미널 입력으로 바꾼다. 어떤 경우에도 입력만 하고 실행되면 안 된다.
+// 붙여넣기와 Enter가 한 덩어리로 오면 에이전트 TUI가 Enter를 줄바꿈으로 받을 수 있다. 제출이 안 되면 늘린다.
+const ENTER_DELAY_MS = 300
+
+// 메모를 터미널 입력으로 바꾼다. 메모 내용만으로는 실행되면 안 되고, 실행은 typeAndRun의 Enter로만 일어난다.
 // 일반 셸은 bracketed paste를 보내도 PowerShell이 앞줄을 실행하므로(직접 확인) 한 줄로 합친다.
 export function terminalInput(text, isAgent) {
   const clean = text
@@ -37,6 +40,14 @@ export function activeTerminalId(layouts, terminalIds) {
   return null
 }
 
+// 합쳐진 여러 줄은 메모에 없던 명령이 되므로 호출하는 쪽이 run을 꺼서 입력만 한다.
+export async function typeAndRun(send, input, run, delayMs = ENTER_DELAY_MS) {
+  if (!(await send(input))) return false
+  if (!run) return true
+  await new Promise((resolve) => setTimeout(resolve, delayMs))
+  return send('\r')
+}
+
 const listTerminals = () =>
   new Promise((resolve, reject) => {
     execFile(
@@ -68,8 +79,8 @@ export default function activate(orca) {
 
     const target = terminals.find((terminal) => terminal.handle === terminalId)
     const { input, flattened } = terminalInput(text, Boolean(target?.agentIdentity))
-    const { accepted } = await orca.host.call('terminal.sendText', { terminalId, text: input, enter: false })
-    if (!accepted) return { error: '터미널이 입력을 받지 않았습니다.' }
+    const send = async (text) => (await orca.host.call('terminal.sendText', { terminalId, text, enter: false })).accepted
+    if (!(await typeAndRun(send, input, !flattened))) return { error: '터미널이 입력을 받지 않았습니다.' }
     return { title: target?.title ?? '터미널', flattened }
   })
 }

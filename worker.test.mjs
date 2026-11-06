@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { activeTerminalId, terminalInput } from './worker.mjs'
+import { activeTerminalId, terminalInput, typeAndRun } from './worker.mjs'
 
 test('셸에는 여러 줄을 한 줄로 합쳐서 실행되지 않게 한다', () => {
   assert.deepEqual(terminalInput('echo a\r\n\n  echo b\n', false), { input: 'echo a echo b', flattened: true })
@@ -22,6 +22,22 @@ test('제어 문자로 붙여넣기를 빠져나갈 수 없다', () => {
 
 test('nbsp는 일반 공백으로 바꾼다', () => {
   assert.equal(terminalInput('git status', false).input, 'git status')
+})
+
+test('입력한 뒤 Enter를 따로 보내고, 합친 여러 줄이나 거부된 입력은 실행하지 않는다', async () => {
+  const sender = (accepted = true) => {
+    const sent = []
+    return { sent, send: async (text) => (sent.push(text), accepted) }
+  }
+  const run = sender()
+  assert.equal(await typeAndRun(run.send, 'ls', true, 0), true)
+  assert.deepEqual(run.sent, ['ls', '\r'])
+  const typeOnly = sender()
+  assert.equal(await typeAndRun(typeOnly.send, 'a b', false, 0), true)
+  assert.deepEqual(typeOnly.sent, ['a b'])
+  const refused = sender(false)
+  assert.equal(await typeAndRun(refused.send, 'ls', true, 0), false)
+  assert.deepEqual(refused.sent, ['ls'])
 })
 
 const pane = (leafId, handle) => ({ type: 'terminal', leafId, handle })

@@ -57,3 +57,32 @@ export const formatDate = (timestamp, locale) =>
     hour: 'numeric',
     minute: '2-digit'
   })
+
+const isNote = (note) =>
+  typeof note?.id === 'string' &&
+  typeof note.title === 'string' &&
+  typeof note.html === 'string' &&
+  typeof note.text === 'string' &&
+  Object.hasOwn(COLORS, note.color) &&
+  typeof note.pinned === 'boolean' &&
+  Number.isFinite(note.createdAt) &&
+  Number.isFinite(note.updatedAt)
+
+export const backupJson = (notes) => JSON.stringify({ version: 1, notes: persistable(notes) }, null, 2)
+
+// 파일은 외부 입력이다. 하나라도 형식이 틀리면 일부만 들여오지 않고 전체를 거부한다.
+export function parseBackup(json) {
+  const notes = JSON.parse(json)?.notes
+  if (!Array.isArray(notes) || !notes.every(isNote)) throw new Error('백업 파일 형식이 아닙니다.')
+  return persistable(notes)
+}
+
+// 기존 메모를 지우지 않는다. 같은 id는 더 최근에 수정된 쪽만 남긴다.
+export function mergeNotes(notes, imported) {
+  const byId = new Map(notes.map((note) => [note.id, note]))
+  for (const note of imported) {
+    const mine = byId.get(note.id)
+    if (!mine || note.updatedAt > mine.updatedAt) byId.set(note.id, note)
+  }
+  return [...byId.values()]
+}
