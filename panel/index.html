@@ -65,6 +65,9 @@
       .card:has(.card-body:hover) { border-color: var(--orca-input); }
       .card-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 8px; min-height: 34px; padding: 4px 8px 4px 12px; }
       .card-title { flex: 1 1 96px; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .card-title[aria-expanded] { cursor: pointer; }
+      .card-title[aria-expanded]::before { content: '▸'; display: inline-block; width: 14px; color: var(--orca-muted-foreground); }
+      .card-title[aria-expanded='true']::before { content: '▾'; }
       .card-pin { flex: none; width: 13px; height: 13px; margin-right: auto; color: var(--c); }
       .date { flex: none; font-size: 11px; color: var(--orca-muted-foreground); }
       .apply {
@@ -219,6 +222,7 @@
       let loaded = false // 불러오기 전에는 절대 저장하지 않는다. 빈 목록으로 덮어쓰면 메모가 사라진다.
       let saveTimer = null
       let statusTimer = null
+      const expanded = new Set() // 펼친 메모 id. 저장하지 않으므로 패널을 새로 열면 모두 접힌다.
       let writes = Promise.resolve()
 
       function showError(message, retry) {
@@ -274,6 +278,15 @@
         button.disabled = false
       }
 
+      function onActivate(element, handler) {
+        element.addEventListener('click', handler)
+        element.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          handler()
+        })
+      }
+
       function card(note) {
         const element = document.createElement('div')
         element.className = 'card'
@@ -295,7 +308,6 @@
 
         const top = document.createElement('div')
         top.className = 'card-top'
-        top.classList.toggle('divided', Boolean(note.title.trim() && note.text.trim()))
         top.append(date)
 
         if (note.title.trim()) {
@@ -304,6 +316,23 @@
           heading.textContent = note.title
           heading.title = note.title
           top.prepend(heading)
+
+          // 내용이 있는 메모만 접는다. 제목만 있으면 접을 것이 없고, 본문 영역이 상세보기 입구로 남아야 한다.
+          if (note.text.trim()) {
+            const setOpen = (open) => {
+              body.hidden = !open
+              top.classList.toggle('divided', open)
+              heading.setAttribute('aria-expanded', String(open))
+            }
+            heading.tabIndex = 0
+            heading.setAttribute('role', 'button')
+            setOpen(expanded.has(note.id))
+            onActivate(heading, () => {
+              const open = !expanded.delete(note.id)
+              if (open) expanded.add(note.id)
+              setOpen(open)
+            })
+          }
         }
         if (note.pinned) {
           const pin = $('pin').querySelector('svg').cloneNode(true)
@@ -313,12 +342,7 @@
           top.prepend(pin)
         }
         body.append(preview)
-        body.addEventListener('click', () => openNote(note))
-        body.addEventListener('keydown', (event) => {
-          if (event.key !== 'Enter' && event.key !== ' ') return
-          event.preventDefault()
-          openNote(note)
-        })
+        onActivate(body, () => openNote(note))
         element.append(top, body)
 
         // 제목만 있는 메모는 넣을 내용이 없다.
