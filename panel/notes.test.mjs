@@ -27,6 +27,16 @@ test('제목만 있어도 저장하고 검색된다', () => {
   assert.deepEqual(visibleNotes([titled, note('다른 내용')], '장보기'), [titled])
 })
 
+test('조회 조건에 따라 제목 또는 내용에서만 찾는다', () => {
+  const inTitle = { ...note('다른 글', 1), title: '회의' }
+  const inText = { ...note('회의 내용', 2), title: '다른 제목' }
+  const notes = [inTitle, inText]
+  assert.deepEqual(visibleNotes(notes, '회의', 'all'), [inText, inTitle])
+  assert.deepEqual(visibleNotes(notes, '회의', 'title'), [inTitle])
+  assert.deepEqual(visibleNotes(notes, '회의', 'text'), [inText])
+  assert.equal(visibleNotes(notes, '', 'title').length, 2)
+})
+
 test('제목 없이 저장된 기존 메모도 읽을 수 있다', () => {
   const [old] = withDefaults([{ id: 'a', html: 'x', text: 'x', color: 'blue', updatedAt: 1 }])
   assert.equal(old.title, '')

@@ -26,10 +26,17 @@ export const withDefaults = (stored) => stored.map((note) => ({ title: '', ...no
 // Windows 스티커 메모처럼 제목도 내용도 없는 메모는 남기지 않는다.
 export const persistable = (notes) => notes.filter((note) => note.title.trim() || note.text.trim())
 
-export function visibleNotes(notes, query) {
+const SEARCH_FIELDS = {
+  all: (note) => `${note.title}\n${note.text}`,
+  title: (note) => note.title,
+  text: (note) => note.text
+}
+
+export function visibleNotes(notes, query, scope = 'all') {
   const needle = query.trim().toLocaleLowerCase()
+  const field = SEARCH_FIELDS[scope]
   return notes
-    .filter((note) => `${note.title}\n${note.text}`.toLocaleLowerCase().includes(needle))
+    .filter((note) => field(note).toLocaleLowerCase().includes(needle))
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 

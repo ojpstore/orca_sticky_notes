@@ -32,7 +32,20 @@
       .settings { margin: 0 12px 10px; padding: 8px 10px; font-size: 13px; background: var(--orca-card); border-radius: 4px; }
       .settings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 
-      .search { position: relative; flex: none; margin: 0 12px 12px; }
+      .filter { display: flex; gap: 6px; flex: none; margin: 0 12px 12px; }
+      #scope {
+        flex: none;
+        height: 32px;
+        padding: 0 4px;
+        font: inherit;
+        color: inherit;
+        background: var(--orca-muted);
+        border: 0;
+        border-bottom: 1px solid var(--orca-input);
+        border-radius: 3px;
+      }
+      #scope option { color: var(--orca-popover-foreground); background: var(--orca-popover); }
+      .search { position: relative; flex: 1; min-width: 0; }
       .search input {
         width: 100%;
         height: 32px;
@@ -51,17 +64,30 @@
       .cards { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
       .card {
         flex: none;
-        padding: 4px 12px 12px;
         background: var(--orca-card);
         color: var(--orca-card-foreground);
         border-top: 3px solid var(--c);
         border-radius: 4px;
-        cursor: pointer;
       }
-      .card:hover { background: var(--orca-accent); }
-      .date { text-align: right; font-size: 11px; color: var(--c); }
+      .card:has(.card-body:hover) { background: var(--orca-accent); }
+      .card-top { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 26px; padding: 3px 8px 0 12px; }
+      .card-body { min-height: 28px; padding: 2px 12px 12px; cursor: pointer; } /* 제목만 있는 메모도 누를 영역이 남아야 한다. */
+      .apply {
+        flex: none;
+        padding: 1px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+        color: var(--orca-secondary-foreground);
+        background: var(--orca-secondary);
+        border-radius: 3px;
+      }
+      .apply:hover:not(:disabled) { color: var(--orca-primary-foreground); background: var(--orca-primary); }
+      .apply:disabled { opacity: 0.6; cursor: default; }
+      .status { flex: none; margin: 0; padding: 6px 12px; font-size: 12px; color: var(--orca-muted-foreground); border-top: 1px solid var(--orca-border); }
+      .date { font-size: 11px; color: var(--c); }
       html.light .date { color: color-mix(in srgb, var(--c) 55%, black); }
-      .card-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .card-title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .date { flex: none; }
       .preview:empty { display: none; }
       .preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; }
       .empty { margin: 24px 0; text-align: center; color: var(--orca-muted-foreground); }
@@ -75,20 +101,33 @@
       #confirm { gap: 8px; padding: 6px 12px; font-size: 13px; background: var(--orca-card); }
       #confirm button { padding: 2px 10px; border-radius: 3px; background: var(--orca-secondary); color: var(--orca-secondary-foreground); }
       #confirm #confirm-yes { background: var(--orca-destructive); color: var(--orca-destructive-foreground); }
+      .title-row { border-bottom: 1px solid var(--orca-border); }
       #title {
-        flex: none;
-        width: 100%;
-        padding: 8px 12px 6px;
+        flex: 1;
+        min-width: 0;
+        padding: 8px 4px 6px 12px;
         font: inherit;
         font-size: 16px;
         font-weight: 600;
         color: inherit;
         background: none;
         border: 0;
-        border-bottom: 1px solid var(--orca-border);
         outline: none;
       }
       #title::placeholder { color: var(--orca-muted-foreground); font-weight: 400; }
+      #emojis {
+        flex: none;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 32px);
+        justify-content: space-between;
+        max-height: 148px;
+        overflow-y: auto;
+        padding: 6px 12px;
+        background: var(--orca-card);
+        border-bottom: 1px solid var(--orca-border);
+      }
+      #emojis button { height: 32px; padding: 0; font-size: 18px; border-radius: 4px; }
+      #emojis button:hover { background: var(--orca-accent); }
       #editor { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 12px; outline: none; overflow-wrap: anywhere; }
       #editor:empty::before { content: attr(data-placeholder); color: var(--orca-muted-foreground); }
       #format { border-top: 1px solid var(--orca-border); }
@@ -112,11 +151,19 @@
       <div id="settings" class="settings" hidden>
         <label><input id="confirm-setting" type="checkbox" /> 삭제하기 전에 확인</label>
       </div>
-      <div class="search">
-        <input id="query" type="search" placeholder="검색..." aria-label="메모 검색" />
-        <svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" /></svg>
+      <div class="filter">
+        <select id="scope" aria-label="조회 조건">
+          <option value="all">전체</option>
+          <option value="title">제목</option>
+          <option value="text">내용</option>
+        </select>
+        <div class="search">
+          <input id="query" type="search" placeholder="검색..." aria-label="메모 검색" />
+          <svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" /></svg>
+        </div>
       </div>
       <div id="cards" class="cards"></div>
+      <p id="status" class="status" role="status" hidden></p>
     </section>
 
     <section id="note" class="view" hidden>
@@ -138,7 +185,13 @@
         <button id="confirm-yes">삭제</button>
         <button id="confirm-no">취소</button>
       </div>
-      <input id="title" type="text" placeholder="제목" aria-label="메모 제목" autocomplete="off" />
+      <div class="bar title-row">
+        <input id="title" type="text" placeholder="제목" aria-label="메모 제목" autocomplete="off" />
+        <button id="emoji" class="icon" aria-label="이모지" title="이모지" aria-expanded="false">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" /><path d="M7 12c.7 1 1.7 1.5 3 1.5s2.300-.5 3-1.5M7.500 8h.01M12.500 8h.01" /></svg>
+        </button>
+      </div>
+      <div id="emojis" role="group" aria-label="이모지 선택" hidden></div>
       <div id="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="메모 내용" data-placeholder="메모 입력..."></div>
       <div id="format" class="bar">
         <button class="icon" data-command="bold" aria-label="굵게" aria-pressed="false" title="굵게 (Ctrl+B)"><b>B</b></button>
@@ -159,12 +212,15 @@
       const title = $('title')
       const SAVE_DELAY_MS = 300
       const RETRY_DELAY_MS = 3000
+      const STATUS_MS = 4000
+      const EMOJIS = '📌 ⭐ ✅ ❌ ⚠️ ❗ ❓ 💡 🔥 🚀 🎯 🏆 📝 📅 ⏰ 📎 🔗 📁 📊 💻 🐛 🔧 🔒 🔑 💰 🛒 🏠 ✈️ 🍀 🎉 ❤️ 👍 👀 🙂 😂 😢 😡 🤔 🙏 💪'.split(' ')
 
       let notes = []
       let current = null
       let confirmDelete = true
       let loaded = false // 불러오기 전에는 절대 저장하지 않는다. 빈 목록으로 덮어쓰면 메모가 사라진다.
       let saveTimer = null
+      let statusTimer = null
       let writes = Promise.resolve()
 
       function showError(message, retry) {
@@ -198,13 +254,38 @@
         saveTimer = setTimeout(flush, delay)
       }
 
+      function showStatus(message) {
+        clearTimeout(statusTimer)
+        $('status').textContent = message
+        $('status').hidden = false
+        statusTimer = setTimeout(() => {
+          $('status').hidden = true
+        }, STATUS_MS)
+      }
+
+      async function applyToTerminal(note, button) {
+        button.disabled = true
+        showError(null)
+        try {
+          const result = await orca.plugin.request('terminal.apply', { text: note.text })
+          if (result.error) showError(result.error)
+          else showStatus(`'${result.title}'에 넣었습니다.${result.flattened ? ' 일반 셸이라 줄바꿈은 공백으로 바꿨습니다.' : ''}`)
+        } catch {
+          showError('터미널에 보내지 못했습니다.')
+        }
+        button.disabled = false
+      }
+
       function card(note) {
         const element = document.createElement('div')
         element.className = 'card'
-        element.tabIndex = 0
-        element.setAttribute('role', 'button')
-        element.setAttribute('aria-label', (note.title || note.text).slice(0, 80))
         element.style.setProperty('--c', COLORS[note.color])
+
+        const body = document.createElement('div')
+        body.className = 'card-body'
+        body.tabIndex = 0
+        body.setAttribute('role', 'button')
+        body.setAttribute('aria-label', (note.title || note.text).slice(0, 80))
 
         const date = document.createElement('div')
         date.className = 'date'
@@ -214,26 +295,41 @@
         preview.className = 'preview'
         preview.innerHTML = note.html // 붙여넣기와 끌어놓기를 일반 텍스트로 제한해서 편집기 서식만 들어 있다.
 
-        element.append(date)
+        const top = document.createElement('div')
+        top.className = 'card-top'
+        top.append(date)
+
         if (note.title.trim()) {
           const heading = document.createElement('div')
           heading.className = 'card-title'
           heading.textContent = note.title
-          element.append(heading)
+          heading.title = note.title
+          top.prepend(heading)
         }
-        element.append(preview)
-        element.addEventListener('click', () => openNote(note))
-        element.addEventListener('keydown', (event) => {
+        body.append(preview)
+        body.addEventListener('click', () => openNote(note))
+        body.addEventListener('keydown', (event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return
           event.preventDefault()
           openNote(note)
         })
+        element.append(top, body)
+
+        // 제목만 있는 메모는 넣을 내용이 없다.
+        if (note.text.trim()) {
+          const apply = document.createElement('button')
+          apply.className = 'apply'
+          apply.textContent = '적용'
+          apply.title = '활성 터미널에 메모 내용 넣기'
+          apply.addEventListener('click', () => applyToTerminal(note, apply))
+          top.append(apply)
+        }
         return element
       }
 
       function renderList() {
         const query = $('query').value
-        const shown = visibleNotes(notes, query)
+        const shown = visibleNotes(notes, query, $('scope').value)
         if (shown.length) {
           $('cards').replaceChildren(...shown.map(card))
           return
@@ -256,11 +352,17 @@
         $('palette').setAttribute('aria-expanded', String(open))
       }
 
+      function toggleEmojis(open) {
+        $('emojis').hidden = !open
+        $('emoji').setAttribute('aria-expanded', String(open))
+      }
+
       function openNote(note) {
         current = note
         title.value = note.title
         editor.innerHTML = note.html
         togglePalette(false)
+        toggleEmojis(false)
         $('confirm').hidden = true
         renderSwatches()
         $('list').hidden = true
@@ -285,8 +387,10 @@
       }
 
       function syncFormatButtons() {
+        // 제목은 글꼴이 굵어서 커서가 거기 있으면 '굵게'가 켜진 것으로 읽힌다.
+        const inEditor = document.activeElement === editor
         for (const button of document.querySelectorAll('[data-command]')) {
-          button.setAttribute('aria-pressed', String(document.queryCommandState(button.dataset.command)))
+          button.setAttribute('aria-pressed', String(inEditor && document.queryCommandState(button.dataset.command)))
         }
       }
 
@@ -322,6 +426,18 @@
         $('swatches').append(swatch)
       }
 
+      for (const emoji of EMOJIS) {
+        const button = document.createElement('button')
+        button.textContent = emoji
+        button.addEventListener('click', () => {
+          title.setRangeText(emoji, title.selectionStart, title.selectionEnd, 'end')
+          title.dispatchEvent(new Event('input')) // 저장은 직접 입력과 같은 경로를 탄다.
+          toggleEmojis(false)
+          title.focus()
+        })
+        $('emojis').append(button)
+      }
+
       $('add').disabled = true
       $('add').addEventListener('click', () => {
         const note = newNote()
@@ -338,9 +454,11 @@
         orca.storage.set('confirmDelete', confirmDelete).catch(() => showError('설정을 저장하지 못했습니다.'))
       })
       $('query').addEventListener('input', renderList)
+      $('scope').addEventListener('change', renderList)
 
       $('back').addEventListener('click', closeNote)
       $('palette').addEventListener('click', () => togglePalette($('swatches').hidden))
+      $('emoji').addEventListener('click', () => toggleEmojis($('emojis').hidden))
       $('delete').addEventListener('click', () => {
         if (confirmDelete && persistable([current]).length) $('confirm').hidden = false
         else deleteCurrent()

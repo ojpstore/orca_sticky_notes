@@ -5,10 +5,11 @@
   "version": "0.1.0",
   "description": "Windows 스티커 메모처럼 Orca 사이드바에서 메모를 쓰고 검색합니다.",
   "engines": {
-    "orca": ">=1.4.246"
+    "orca": ">=1.4.248"
   },
-  "execution": "sandboxed-ui",
+  "execution": "trusted-worker",
   "pluginApi": 1,
+  "main": "worker.mjs",
   "contributes": {
     "panels": [
       {
@@ -22,6 +23,12 @@
   "capabilities": [
     {
       "kind": "storage:own"
+    },
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "terminal:send"
     }
   ]
 }
