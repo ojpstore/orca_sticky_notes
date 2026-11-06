@@ -55,6 +55,18 @@ export function orcaCli(execPath = process.execPath, exists = existsSync) {
   return exists(bundled) ? bundled : 'orca'
 }
 
+// CLI는 --json 실패 이유를 stderr가 아니라 stdout으로 보내서 execFile 오류에는 명령줄만 남는다.
+export function cliResult(error, stdout) {
+  let reply = null
+  try {
+    reply = JSON.parse(stdout)
+  } catch {
+    if (!error) throw new Error('orca CLI가 JSON이 아닌 응답을 보냈습니다.')
+  }
+  if (reply?.ok) return reply.result
+  throw reply?.error?.message ? new Error(reply.error.message) : (error ?? new Error('orca CLI가 실패했습니다.'))
+}
+
 const listTerminals = () =>
   new Promise((resolve, reject) => {
     execFile(
@@ -68,8 +80,11 @@ const listTerminals = () =>
         windowsHide: true
       },
       (error, stdout) => {
-        if (error) reject(error)
-        else resolve(JSON.parse(stdout).result)
+        try {
+          resolve(cliResult(error, stdout))
+        } catch (failure) {
+          reject(failure)
+        }
       }
     )
   })

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { activeTerminalId, orcaCli, terminalInput, typeAndRun } from './worker.mjs'
+import { activeTerminalId, cliResult, orcaCli, terminalInput, typeAndRun } from './worker.mjs'
 
 test('셸에는 여러 줄을 한 줄로 합쳐서 실행되지 않게 한다', () => {
   assert.deepEqual(terminalInput('echo a\r\n\n  echo b\n', false), { input: 'echo a echo b', flattened: true })
@@ -70,4 +70,12 @@ test('PATH에 등록되지 않아도 앱에 번들된 CLI를 쓰고, 없으면 P
   const bundled = join('C:', 'Orca', 'resources', 'bin', 'orca.exe')
   assert.equal(orcaCli(execPath, (path) => path === bundled), bundled)
   assert.equal(orcaCli(execPath, () => false), 'orca')
+})
+
+test('CLI가 stdout JSON으로 알린 실패 이유를 오류 메시지로 쓴다', () => {
+  const failed = new Error('Command failed: orca')
+  const stdout = JSON.stringify({ ok: false, error: { code: 'runtime_unavailable', message: 'Start the Orca app first.' } })
+  assert.throws(() => cliResult(failed, stdout), /Start the Orca app first\./)
+  assert.throws(() => cliResult(failed, ''), /Command failed: orca/)
+  assert.deepEqual(cliResult(null, JSON.stringify({ ok: true, result: { terminals: [] } })), { terminals: [] })
 })
