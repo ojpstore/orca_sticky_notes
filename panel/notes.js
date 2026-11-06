@@ -10,6 +10,14 @@ export const COLORS = {
   charcoal: '#6b6b6b'
 }
 
+// 아직 고른 이모지가 없을 때 '자주 사용'에 보여 주는 목록이다. 이 길이가 '자주 사용'의 최대 개수다.
+export const DEFAULT_EMOJIS = '📌 ⭐ ✅ ❌ ⚠️ ❗ ❓ 💡 🔥 🚀 🎯 🏆 📝 📅 ⏰ 📎 🔗 📁 📊 💻 🐛 🔧 🔒 🔑 💰 🛒 🏠 ✈️ 🍀 🎉 ❤️ 👍 👀 🙂 😂 😢 😡 🤔 🙏 💪'.split(' ')
+
+export const pushRecent = (recent, emoji) =>
+  [emoji, ...recent.filter((other) => other !== emoji)].slice(0, DEFAULT_EMOJIS.length)
+
+export const matchesEmoji = (entry, query) => `${entry.n} ${entry.k}`.includes(query.trim().toLocaleLowerCase())
+
 // crypto.randomUUID는 보안 컨텍스트가 필요해서 샌드박스 프레임에서 보장되지 않는다.
 export const newNote = (now = Date.now()) => ({
   id: `${now.toString(36)}-${Math.random().toString(36).slice(2)}`,

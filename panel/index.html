@@ -138,18 +138,22 @@
         outline: none;
       }
       #title::placeholder { color: var(--orca-muted-foreground); font-weight: 400; }
-      #emojis {
-        flex: none;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, 30px);
-        justify-content: space-between;
-        max-height: 140px;
-        overflow-y: auto;
-        padding: 6px 10px;
-        border-bottom: 1px solid var(--orca-border);
-      }
-      #emojis button { height: 30px; padding: 0; font-size: 16px; border-radius: var(--radius); }
-      #emojis button:hover { background: var(--orca-accent); }
+      #emojis { flex: none; display: flex; flex-direction: column; height: min(340px, 60vh); border-bottom: 1px solid var(--orca-border); }
+      .emoji-search { gap: 8px; padding: 8px 10px 4px; }
+      .tones { display: flex; flex: none; gap: 4px; }
+      .tone { width: 16px; height: 16px; padding: 0; background: var(--c); border-radius: 4px; }
+      .tones:not(.open) .tone[aria-pressed='false'] { display: none; }
+      .tones.open .tone[aria-pressed='true'] { box-shadow: 0 0 0 1px var(--orca-background), 0 0 0 2px var(--orca-foreground); }
+      #emoji-tabs { justify-content: space-between; padding: 0 6px 2px; border-bottom: 1px solid var(--orca-border); }
+      #emoji-tabs .icon[aria-pressed='true'] { background: none; color: var(--orca-primary); }
+      #emoji-sections { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
+      #emoji-sections h2 { position: sticky; top: 0; margin: 0; padding: 6px 0 2px; font-size: 12px; font-weight: 600; background: var(--orca-background); }
+      .emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); }
+      .emoji-grid button { height: 32px; padding: 0; font-size: 20px; line-height: 1; border-radius: var(--radius); }
+      .emoji-grid button:hover { background: var(--orca-accent); }
+      #emoji-preview { gap: 8px; height: 44px; padding: 0 12px; font-size: 12px; border-top: 1px solid var(--orca-border); }
+      #emoji-preview-glyph { font-size: 26px; line-height: 1; }
+      #emoji-preview-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       #editor { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px; outline: none; overflow-wrap: anywhere; }
       #editor:empty::before { content: attr(data-placeholder); color: var(--orca-muted-foreground); }
       #format { gap: 2px; padding: 6px 8px; border-top: 1px solid var(--orca-border); }
@@ -233,7 +237,23 @@
           <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" /><path d="M7 12c.7 1 1.7 1.5 3 1.5s2.300-.5 3-1.5M7.500 8h.01M12.500 8h.01" /></svg>
         </button>
       </div>
-      <div id="emojis" role="group" aria-label="이모지 선택" hidden></div>
+      <div id="emojis" role="group" aria-label="이모지 선택" hidden>
+        <div class="bar emoji-search">
+          <div class="search">
+            <input id="emoji-query" type="search" placeholder="이모지 검색" aria-label="이모지 검색" autocomplete="off" />
+            <svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" /></svg>
+          </div>
+          <div id="tones" class="tones" role="group" aria-label="피부색"></div>
+        </div>
+        <div id="emoji-tabs" class="bar"></div>
+        <div id="emoji-sections">
+          <p id="emoji-empty" class="empty" hidden>검색 결과가 없습니다.</p>
+        </div>
+        <div id="emoji-preview" class="bar">
+          <span id="emoji-preview-glyph"></span>
+          <span id="emoji-preview-name"></span>
+        </div>
+      </div>
       <div id="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="메모 내용" data-placeholder="메모 입력..."></div>
       <div id="format" class="bar">
         <button class="icon" data-command="bold" aria-label="굵게" aria-pressed="false" title="굵게 (Ctrl+B)"><b>B</b></button>
@@ -247,7 +267,8 @@
     </section>
 
     <script type="module">
-      import { backupJson, COLORS, formatDate, mergeNotes, newNote, parseBackup, persistable, visibleNotes, withDefaults } from './notes.js'
+      import { EMOJI_GROUPS } from './emoji-data.js'
+      import { backupJson, COLORS, DEFAULT_EMOJIS, formatDate, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
 
       const $ = (id) => document.getElementById(id)
       const editor = $('editor')
@@ -258,11 +279,35 @@
       const TIP_DELAY_MS = 400
       const TIP_GAP_PX = 4
       const NOTE_TAGS = new Set(['B', 'I', 'U', 'S', 'STRIKE', 'STRONG', 'EM', 'UL', 'OL', 'LI', 'DIV', 'P', 'BR', 'SPAN'])
-      const EMOJIS = '📌 ⭐ ✅ ❌ ⚠️ ❗ ❓ 💡 🔥 🚀 🎯 🏆 📝 📅 ⏰ 📎 🔗 📁 📊 💻 🐛 🔧 🔒 🔑 💰 🛒 🏠 ✈️ 🍀 🎉 ❤️ 👍 👀 🙂 😂 😢 😡 🤔 🙏 💪'.split(' ')
+      const SKIN_TONES = [
+        ['기본', '#ffc83d'],
+        ['하얀 피부', '#f7dece'],
+        ['연한 갈색 피부', '#f3d2a2'],
+        ['갈색 피부', '#d5ab88'],
+        ['진한 갈색 피부', '#af7e57'],
+        ['검은색 피부', '#7c533e']
+      ]
+      // 자주 사용, EMOJI_GROUPS 순서다.
+      const EMOJI_TAB_ICONS = [
+        '<circle cx="10" cy="10" r="7" /><path d="M10 6v4l3 2" />',
+        '<circle cx="10" cy="10" r="7" /><path d="M7 12c.7 1 1.7 1.5 3 1.5s2.3-.5 3-1.5M7.5 8h.01M12.5 8h.01" />',
+        '<path d="M4 3.5 7.5 6h5L16 3.5V11a6 6 0 0 1-12 0zM8 10.5h.01M12 10.5h.01M9 13.5h2" />',
+        '<path d="M3.5 9a6.5 6 0 0 1 13 0zM3 12h14M4 15h12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />',
+        '<rect x="4" y="3" width="12" height="12" rx="2" /><path d="M4 10h12M7 15v2M13 15v2M7 12.5h.01M13 12.5h.01" />',
+        '<circle cx="10" cy="10" r="7" /><path d="M5 5c3 3 3 7 0 10M15 5c-3 3-3 7 0 10" />',
+        '<path d="M7 3 3 6l2 3 2-1v9h6V8l2 1 2-3-4-3c-.5 1.3-1.5 2-3 2s-2.5-.7-3-2z" />',
+        '<path d="M8 15V5l8-2v10" /><circle cx="6" cy="15" r="2" /><circle cx="14" cy="13" r="2" />',
+        '<path d="M5 17V3.5c3-1.5 5 1.5 10 0v8c-5 1.5-7-1.5-10 0" />'
+      ]
 
       let notes = []
       let current = null
       let confirmDelete = true
+      let recentEmojis = DEFAULT_EMOJIS
+      let emojiTone = 0 // SKIN_TONES 위치. 0은 피부색 없는 기본 글자다.
+      let emojiSections = [] // 처음 열 때 만든다. 글자 버튼이 2천 개 가까워서 메모만 보는 동안에는 만들지 않는다.
+      const emojiCells = [] // { button, entry }
+      const emojiNames = new Map()
       let loaded = false // 불러오기 전에는 절대 저장하지 않는다. 빈 목록으로 덮어쓰면 메모가 사라진다.
       let saveTimer = null
       let statusTimer = null
@@ -483,9 +528,97 @@
         $('palette').setAttribute('aria-expanded', String(open))
       }
 
+      function emojiButton(glyph, name) {
+        const button = document.createElement('button')
+        button.textContent = glyph
+        button.setAttribute('aria-label', name)
+        return button
+      }
+
+      function emojiSection(name, buttons) {
+        const section = document.createElement('section')
+        const heading = document.createElement('h2')
+        heading.textContent = name
+        const grid = document.createElement('div')
+        grid.className = 'emoji-grid'
+        grid.append(...buttons)
+        section.append(heading, grid)
+        return section
+      }
+
+      const tonedEmoji = (entry) => entry.s?.[emojiTone - 1] ?? entry.e
+
+      function showEmojiPreview(button) {
+        $('emoji-preview-glyph').textContent = button?.textContent ?? '😊'
+        $('emoji-preview-name').textContent = button?.getAttribute('aria-label') ?? '기분이 어떠세요?'
+      }
+
+      function renderRecentEmojis() {
+        emojiSections[0].querySelector('.emoji-grid').replaceChildren(...recentEmojis.map((emoji) => emojiButton(emoji, emojiNames.get(emoji) ?? emoji)))
+      }
+
+      function syncEmojiTab() {
+        const top = $('emoji-sections').scrollTop + 1
+        const active = emojiSections.findLastIndex((section) => !section.hidden && section.offsetTop <= top)
+        for (const [index, tab] of [...$('emoji-tabs').children].entries()) tab.setAttribute('aria-pressed', String(index === active))
+      }
+
+      function filterEmojis() {
+        const query = $('emoji-query').value
+        for (const { button, entry } of emojiCells) button.hidden = !matchesEmoji(entry, query)
+        // 자주 사용은 아래 분류와 겹쳐서 검색 결과에 넣지 않는다.
+        emojiSections[0].hidden = Boolean(query.trim())
+        for (const section of emojiSections.slice(1)) section.hidden = !section.querySelector('button:not([hidden])')
+        $('emoji-empty').hidden = emojiSections.some((section) => !section.hidden)
+        $('emoji-sections').scrollTop = 0
+        syncEmojiTab()
+      }
+
+      function setEmojiTone(tone) {
+        emojiTone = tone
+        for (const [index, swatch] of [...$('tones').children].entries()) swatch.setAttribute('aria-pressed', String(index === tone))
+        for (const { button, entry } of emojiCells) button.textContent = tonedEmoji(entry)
+      }
+
+      function buildEmojis() {
+        emojiSections = [
+          emojiSection('자주 사용', []),
+          ...EMOJI_GROUPS.map(({ name, emojis }) => {
+            const cells = emojis.map((entry) => ({ button: emojiButton(tonedEmoji(entry), entry.n), entry }))
+            emojiCells.push(...cells)
+            return emojiSection(name, cells.map((cell) => cell.button))
+          })
+        ]
+        for (const { e, n, s = [] } of EMOJI_GROUPS.flatMap((group) => group.emojis)) {
+          for (const glyph of [e, ...s]) emojiNames.set(glyph, n)
+        }
+        $('emoji-sections').append(...emojiSections)
+        for (const [index, section] of emojiSections.entries()) {
+          const tab = document.createElement('button')
+          tab.className = 'icon'
+          tab.title = section.firstChild.textContent
+          tab.setAttribute('aria-label', tab.title)
+          tab.innerHTML = `<svg viewBox="0 0 20 20">${EMOJI_TAB_ICONS[index]}</svg>`
+          tab.addEventListener('click', () => {
+            $('emoji-query').value = ''
+            filterEmojis()
+            $('emoji-sections').scrollTop = section.offsetTop
+          })
+          $('emoji-tabs').append(tab)
+        }
+      }
+
       function toggleEmojis(open) {
         $('emojis').hidden = !open
         $('emoji').setAttribute('aria-expanded', String(open))
+        $('tones').classList.remove('open')
+        if (!open) return
+        if (!emojiSections.length) buildEmojis()
+        renderRecentEmojis()
+        showEmojiPreview()
+        $('emoji-query').value = ''
+        filterEmojis()
+        $('emoji-query').focus()
       }
 
       function openNote(note) {
@@ -529,12 +662,16 @@
       async function load() {
         showError(null)
         try {
-          const [stored, confirmSetting] = await Promise.all([
+          const [stored, confirmSetting, recent, tone] = await Promise.all([
             orca.storage.get('notes'),
-            orca.storage.get('confirmDelete')
+            orca.storage.get('confirmDelete'),
+            orca.storage.get('recentEmojis'),
+            orca.storage.get('emojiTone')
           ])
           notes = Array.isArray(stored) ? withDefaults(stored) : []
           confirmDelete = confirmSetting ?? true
+          recentEmojis = recent ?? DEFAULT_EMOJIS
+          setEmojiTone(tone ?? 0)
           loaded = true
           for (const id of ['add', 'backup', 'import']) $(id).disabled = false
           $('confirm-setting').checked = confirmDelete
@@ -558,17 +695,45 @@
         $('swatches').append(swatch)
       }
 
-      for (const emoji of EMOJIS) {
-        const button = document.createElement('button')
-        button.textContent = emoji
-        button.addEventListener('click', () => {
-          title.setRangeText(emoji, title.selectionStart, title.selectionEnd, 'end')
-          title.dispatchEvent(new Event('input')) // 저장은 직접 입력과 같은 경로를 탄다.
-          toggleEmojis(false)
-          title.focus()
+      for (const [index, [name, color]] of SKIN_TONES.entries()) {
+        const swatch = document.createElement('button')
+        swatch.className = 'tone'
+        swatch.title = `피부색: ${name}`
+        swatch.setAttribute('aria-label', swatch.title)
+        swatch.setAttribute('aria-pressed', String(index === 0))
+        swatch.style.setProperty('--c', color)
+        swatch.addEventListener('click', () => {
+          // 닫혀 있으면 고른 색 하나만 보이고, 누르면 나머지가 펼쳐진다.
+          const open = $('tones').classList.toggle('open')
+          if (open) return
+          setEmojiTone(index)
+          orca.storage.set('emojiTone', index).catch(() => showError('설정을 저장하지 못했습니다.'))
         })
-        $('emojis').append(button)
+        $('tones').append(swatch)
       }
+
+      $('emoji-sections').addEventListener('click', (event) => {
+        const emoji = event.target.closest('button')?.textContent
+        if (!emoji) return
+        title.setRangeText(emoji, title.selectionStart, title.selectionEnd, 'end')
+        title.dispatchEvent(new Event('input')) // 저장은 직접 입력과 같은 경로를 탄다.
+        recentEmojis = pushRecent(recentEmojis, emoji)
+        orca.storage.set('recentEmojis', recentEmojis).catch(() => showError('설정을 저장하지 못했습니다.'))
+        toggleEmojis(false)
+        title.focus()
+      })
+      for (const name of ['mouseover', 'focusin']) {
+        $('emoji-sections').addEventListener(name, (event) => showEmojiPreview(event.target.closest('button')))
+      }
+      $('emoji-sections').addEventListener('mouseleave', () => showEmojiPreview())
+      $('emoji-sections').addEventListener('scroll', syncEmojiTab)
+      $('emoji-query').addEventListener('input', filterEmojis)
+      $('emojis').addEventListener('keydown', (event) => {
+        if (event.isComposing || event.key !== 'Escape') return
+        event.preventDefault()
+        toggleEmojis(false)
+        title.focus()
+      })
 
       for (const id of ['add', 'backup', 'import']) $(id).disabled = true
       $('backup').addEventListener('click', backup)

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { backupJson, COLORS, formatDate, mergeNotes, newNote, parseBackup, persistable, visibleNotes, withDefaults } from './notes.js'
+import { EMOJI_GROUPS } from './emoji-data.js'
+import { backupJson, COLORS, DEFAULT_EMOJIS, formatDate, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
 
 const note = (text, updatedAt = 0) => ({ ...newNote(updatedAt), text })
 
@@ -96,4 +97,32 @@ test('가져오기는 기존 메모를 지우지 않고 같은 id는 최근 수�
   const merged = mergeNotes(notes, [at('mine-newer', 2), at('file-newer', 9), at('only-file', 1)])
   assert.deepEqual(merged.map((n) => [n.id, n.updatedAt]), [['only-mine', 1], ['mine-newer', 9], ['file-newer', 9], ['only-file', 1]])
   assert.equal(merged.filter((n) => !notes.includes(n)).length, 2)
+})
+
+const allEmojis = EMOJI_GROUPS.flatMap((group) => group.emojis)
+
+test('기본 이모지는 모두 데이터에 있어서 이름을 보여 줄 수 있다', () => {
+  const glyphs = new Set(allEmojis.map((entry) => entry.e))
+  assert.deepEqual(DEFAULT_EMOJIS.filter((emoji) => !glyphs.has(emoji)), [])
+})
+
+test('피부색이 있는 이모지는 5종을 모두 가진다', () => {
+  assert.ok(allEmojis.some((entry) => entry.s))
+  assert.ok(allEmojis.every((entry) => !entry.s || entry.s.length === 5))
+})
+
+test('고른 이모지가 맨 앞으로 오고 개수는 늘지 않는다', () => {
+  const pushed = pushRecent(DEFAULT_EMOJIS, '🦄')
+  assert.equal(pushed[0], '🦄')
+  assert.equal(pushed.length, DEFAULT_EMOJIS.length)
+  assert.deepEqual(pushRecent(['a', 'b', 'c'], 'b'), ['b', 'a', 'c'])
+})
+
+test('이모지를 한글 이름, 한글 태그, 영어로 찾는다', () => {
+  const found = (query) => allEmojis.filter((entry) => matchesEmoji(entry, query)).map((entry) => entry.e)
+  assert.ok(found('고양이').includes('🐱'))
+  assert.ok(found('따봉').includes('👍'))
+  assert.ok(found(' Thumbs ').includes('👍'))
+  assert.deepEqual(found('없는검색어'), [])
+  assert.equal(found('').length, allEmojis.length)
 })
