@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { activeTerminalId, terminalInput, typeAndRun } from './worker.mjs'
+import { join } from 'node:path'
+import { activeTerminalId, orcaCli, terminalInput, typeAndRun } from './worker.mjs'
 
 test('셸에는 여러 줄을 한 줄로 합쳐서 실행되지 않게 한다', () => {
   assert.deepEqual(terminalInput('echo a\r\n\n  echo b\n', false), { input: 'echo a echo b', flattened: true })
@@ -62,4 +63,11 @@ test('포커스 워크스페이스의 활성 탭과 활성 패널을 찾는다',
 test('활성 탭이 터미널이 아니면 찾지 못한다', () => {
   const layouts = [{ root: { activeTabId: 'editor', tabs: [tab('t1', 'l1', pane('l1', 'first'))] } }]
   assert.equal(activeTerminalId(layouts, new Set(['first'])), null)
+})
+
+test('PATH에 등록되지 않아도 앱에 번들된 CLI를 쓰고, 없으면 PATH로 돌아간다', () => {
+  const execPath = join('C:', 'Orca', 'Orca.exe')
+  const bundled = join('C:', 'Orca', 'resources', 'bin', 'orca.exe')
+  assert.equal(orcaCli(execPath, (path) => path === bundled), bundled)
+  assert.equal(orcaCli(execPath, () => false), 'orca')
 })

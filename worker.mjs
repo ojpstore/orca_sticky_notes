@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 // 붙여넣기와 Enter가 한 덩어리로 오면 에이전트 TUI가 Enter를 줄바꿈으로 받을 수 있다. 제출이 안 되면 늘린다.
 const ENTER_DELAY_MS = 300
@@ -48,10 +49,16 @@ export async function typeAndRun(send, input, run, delayMs = ENTER_DELAY_MS) {
   return send('\r')
 }
 
+// CLI의 PATH 등록은 PC마다 다르다. worker는 Orca.exe로 실행되므로 그 옆의 번들 CLI를 먼저 쓴다.
+export function orcaCli(execPath = process.execPath, exists = existsSync) {
+  const bundled = join(dirname(execPath), 'resources', 'bin', 'orca.exe')
+  return exists(bundled) ? bundled : 'orca'
+}
+
 const listTerminals = () =>
   new Promise((resolve, reject) => {
     execFile(
-      'orca',
+      orcaCli(),
       ['terminal', 'list', '--include-visual-layouts', '--json'],
       {
         // 워커 환경에는 APPDATA가 없어서 CLI가 Orca 런타임을 찾지 못한다.

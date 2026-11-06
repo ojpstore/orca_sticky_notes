@@ -379,8 +379,8 @@
           const result = await orca.plugin.request('terminal.apply', { text: note.text })
           if (result.error) showError(result.error)
           else showStatus(result.flattened ? `'${result.title}'에 넣었습니다. 일반 셸의 여러 줄 메모라 한 줄로 합치고 실행하지 않았습니다.` : `'${result.title}'에서 실행했습니다.`)
-        } catch {
-          showError('터미널에 보내지 못했습니다.')
+        } catch (error) {
+          showError(`터미널에 보내지 못했습니다. ${error?.message ?? error}`)
         }
         button.disabled = false
       }
