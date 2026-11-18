@@ -4,25 +4,25 @@ import { join } from 'node:path'
 import { activeTerminalId, cliResult, orcaCli, terminalInput, typeAndRun } from './worker.mjs'
 
 test('셸에는 여러 줄을 한 줄로 합쳐서 실행되지 않게 한다', () => {
-  assert.deepEqual(terminalInput('echo a\r\n\n  echo b\n', false), { input: 'echo a echo b', flattened: true })
-  assert.deepEqual(terminalInput('git status', false), { input: 'git status', flattened: false })
+  assert.deepEqual(terminalInput('echo a\r\n\n  echo b\n', false), { input: ['echo a echo b'], flattened: true })
+  assert.deepEqual(terminalInput('git status', false), { input: ['git status'], flattened: false })
 })
 
-test('에이전트에는 줄바꿈을 유지해서 붙여넣는다', () => {
-  assert.deepEqual(terminalInput('첫 줄\n둘째 줄', true), {
-    input: '\x1b[200~첫 줄\r둘째 줄\x1b[201~',
+test('에이전트에는 줄마다 붙여넣고 Ctrl+J로 줄바꿈해서 접히지 않게 한다', () => {
+  assert.deepEqual(terminalInput('첫 줄\n\n  - 둘째', true), {
+    input: ['\x1b[200~첫 줄\x1b[201~', '\n', '\n', '\x1b[200~  - 둘째\x1b[201~'],
     flattened: false
   })
 })
 
 test('제어 문자로 붙여넣기를 빠져나갈 수 없다', () => {
   const { input } = terminalInput('a\x1b[201~\x03b\x9bc', true)
-  assert.equal(input, '\x1b[200~a[201~bc\x1b[201~')
-  assert.equal(terminalInput('rm x\r', false).input, 'rm x')
+  assert.deepEqual(input, ['\x1b[200~a[201~bc\x1b[201~'])
+  assert.deepEqual(terminalInput('rm x\r', false).input, ['rm x'])
 })
 
 test('nbsp는 일반 공백으로 바꾼다', () => {
-  assert.equal(terminalInput('git status', false).input, 'git status')
+  assert.deepEqual(terminalInput('git status', false).input, ['git status'])
 })
 
 test('입력한 뒤 Enter를 따로 보내고, 합친 여러 줄이나 거부된 입력은 실행하지 않는다', async () => {
@@ -31,13 +31,13 @@ test('입력한 뒤 Enter를 따로 보내고, 합친 여러 줄이나 거부된
     return { sent, send: async (text) => (sent.push(text), accepted) }
   }
   const run = sender()
-  assert.equal(await typeAndRun(run.send, 'ls', true, 0), true)
+  assert.equal(await typeAndRun(run.send, ['ls'], true, 0, 0), true)
   assert.deepEqual(run.sent, ['ls', '\r'])
   const typeOnly = sender()
-  assert.equal(await typeAndRun(typeOnly.send, 'a b', false, 0), true)
-  assert.deepEqual(typeOnly.sent, ['a b'])
+  assert.equal(await typeAndRun(typeOnly.send, ['a', '\n', 'b'], false, 0, 0), true)
+  assert.deepEqual(typeOnly.sent, ['a', '\n', 'b'])
   const refused = sender(false)
-  assert.equal(await typeAndRun(refused.send, 'ls', true, 0), false)
+  assert.equal(await typeAndRun(refused.send, ['ls', 'x'], true, 0, 0), false)
   assert.deepEqual(refused.sent, ['ls'])
 })
 

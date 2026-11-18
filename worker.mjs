@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 
 // 붙여넣기와 Enter가 한 덩어리로 오면 에이전트 TUI가 Enter를 줄바꿈으로 받을 수 있다. 제출이 안 되면 늘린다.
 const ENTER_DELAY_MS = 300
+// 조각이 한 번에 읽히면 TUI가 하나의 붙여넣기로 볼 수 있어서 조금씩 띄워 보낸다.
+const CHUNK_DELAY_MS = 20
 
 // 메모를 터미널 입력으로 바꾼다. 메모 내용만으로는 실행되면 안 되고, 실행은 typeAndRun의 Enter로만 일어난다.
 // 일반 셸은 bracketed paste를 보내도 PowerShell이 앞줄을 실행하므로(직접 확인) 한 줄로 합친다.
@@ -14,9 +16,14 @@ export function terminalInput(text, isAgent) {
     .replace(/ /g, ' ') // 편집기가 넣는 nbsp는 셸 명령을 깨뜨린다.
     .replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '') // ESC 등 제어 문자로 붙여넣기를 빠져나가지 못하게 한다.
     .trim()
-  if (isAgent) return { input: `\x1b[200~${clean.replace(/\n/g, '\r')}\x1b[201~`, flattened: false }
+  // 여러 줄을 한 번에 붙여넣으면 Claude Code가 [Pasted text +N lines]로 접는다.
+  // 줄마다 따로 붙여넣고 사이에 Ctrl+J(\n, 에이전트 TUI의 줄바꿈 키)를 보내 프롬프트에 펼쳐 둔다.
+  if (isAgent) {
+    const parts = clean.split('\n').flatMap((line, i) => [i ? '\n' : '', line && `\x1b[200~${line}\x1b[201~`])
+    return { input: parts.filter(Boolean), flattened: false }
+  }
   const input = clean.split(/\s*\n\s*/).join(' ')
-  return { input, flattened: input !== clean }
+  return { input: [input], flattened: input !== clean }
 }
 
 function* walk(value) {
@@ -42,8 +49,11 @@ export function activeTerminalId(layouts, terminalIds) {
 }
 
 // 합쳐진 여러 줄은 메모에 없던 명령이 되므로 호출하는 쪽이 run을 꺼서 입력만 한다.
-export async function typeAndRun(send, input, run, delayMs = ENTER_DELAY_MS) {
-  if (!(await send(input))) return false
+export async function typeAndRun(send, input, run, delayMs = ENTER_DELAY_MS, chunkDelayMs = CHUNK_DELAY_MS) {
+  for (const [i, part] of input.entries()) {
+    if (i) await new Promise((resolve) => setTimeout(resolve, chunkDelayMs))
+    if (!(await send(part))) return false
+  }
   if (!run) return true
   await new Promise((resolve) => setTimeout(resolve, delayMs))
   return send('\r')
