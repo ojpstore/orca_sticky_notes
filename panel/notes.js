@@ -19,8 +19,12 @@ export const pushRecent = (recent, emoji) =>
 export const matchesEmoji = (entry, query) => `${entry.n} ${entry.k}`.includes(query.trim().toLocaleLowerCase())
 
 // crypto.randomUUID는 보안 컨텍스트가 필요해서 샌드박스 프레임에서 보장되지 않는다.
-export const newNote = (now = Date.now()) => ({
-  id: `${now.toString(36)}-${Math.random().toString(36).slice(2)}`,
+const newId = (now) => `${now.toString(36)}-${Math.random().toString(36).slice(2)}`
+
+// 그룹 id ''는 이름을 바꾸거나 지울 수 없는 '기본' 그룹이다.
+export const newNote = (now = Date.now(), group = '') => ({
+  id: newId(now),
+  group,
   title: '',
   html: '',
   text: '',
@@ -32,7 +36,16 @@ export const newNote = (now = Date.now()) => ({
 
 // 이전 버전이 저장한 메모에는 없는 필드를 채운다. 작성일자는 기록된 적이 없어서 수정 시각으로 대신한다.
 export const withDefaults = (stored) =>
-  stored.map((note) => ({ title: '', pinned: false, createdAt: note.updatedAt, ...note }))
+  stored.map((note) => ({ title: '', pinned: false, group: '', createdAt: note.updatedAt, ...note }))
+
+export const newGroup = (name, now = Date.now()) => ({ id: newId(now), name })
+
+// 그룹 목록에 없는 그룹을 가리키는 메모는 '기본'으로 옮긴다. 그룹이 지워졌거나 그룹 없이 가져온 메모다.
+export function ungroupOrphans(notes, groups) {
+  const ids = new Set(groups.map((group) => group.id))
+  for (const note of notes) if (!ids.has(note.group)) note.group = ''
+  return notes
+}
 
 // Windows 스티커 메모처럼 제목도 내용도 없는 메모는 남기지 않는다.
 export const persistable = (notes) => notes.filter((note) => note.title.trim() || note.text.trim())
@@ -43,10 +56,12 @@ const SEARCH_FIELDS = {
   text: (note) => note.text
 }
 
-export function visibleNotes(notes, query, scope = 'all') {
+// group이 null이면 모든 그룹의 메모를 보여 준다.
+export function visibleNotes(notes, query, scope = 'all', group = null) {
   const needle = query.trim().toLocaleLowerCase()
   const field = SEARCH_FIELDS[scope]
   return notes
+    .filter((note) => group === null || note.group === group)
     .filter((note) => field(note).toLocaleLowerCase().includes(needle))
     .sort(byPinThenDate)
 }
@@ -62,18 +77,23 @@ const isNote = (note) =>
   typeof note.title === 'string' &&
   typeof note.html === 'string' &&
   typeof note.text === 'string' &&
+  typeof (note.group ?? '') === 'string' &&
   Object.hasOwn(COLORS, note.color) &&
   typeof note.pinned === 'boolean' &&
   Number.isFinite(note.createdAt) &&
   Number.isFinite(note.updatedAt)
 
-export const backupJson = (notes) => JSON.stringify({ version: 1, notes: persistable(notes) }, null, 2)
+const isGroup = (group) => typeof group?.id === 'string' && group.id !== '' && typeof group.name === 'string'
+
+export const backupJson = (notes, groups = []) => JSON.stringify({ version: 1, groups, notes: persistable(notes) }, null, 2)
 
 // 파일은 외부 입력이다. 하나라도 형식이 틀리면 일부만 들여오지 않고 전체를 거부한다.
+// 그룹이 생기기 전의 백업에는 groups가 없다.
 export function parseBackup(json) {
-  const notes = JSON.parse(json)?.notes
+  const { notes, groups = [] } = JSON.parse(json) ?? {}
   if (!Array.isArray(notes) || !notes.every(isNote)) throw new Error('백업 파일 형식이 아닙니다.')
-  return persistable(notes)
+  if (!Array.isArray(groups) || !groups.every(isGroup)) throw new Error('백업 파일 형식이 아닙니다.')
+  return { notes: withDefaults(persistable(notes)), groups }
 }
 
 // 기존 메모를 지우지 않는다. 같은 id는 더 최근에 수정된 쪽만 남긴다.
@@ -85,3 +105,9 @@ export function mergeNotes(notes, imported) {
   }
   return [...byId.values()]
 }
+
+// 같은 id의 그룹은 지금 이름을 유지한다.
+export const mergeGroups = (groups, imported) => [
+  ...groups,
+  ...imported.filter((group) => !groups.some((mine) => mine.id === group.id))
+]

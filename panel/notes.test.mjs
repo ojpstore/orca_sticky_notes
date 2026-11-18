@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { EMOJI_GROUPS } from './emoji-data.js'
-import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
+import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
 
 const note = (text, updatedAt = 0) => ({ ...newNote(updatedAt), text })
 
@@ -71,7 +71,30 @@ test('검색이 원본 배열 순서를 바꾸지 않는다', () => {
 
 test('백업을 다시 읽으면 빈 메모를 뺀 같은 메모가 나온다', () => {
   const kept = { ...note('내용', 5), title: '제목', pinned: true }
-  assert.deepEqual(parseBackup(backupJson([kept, note('')])), [kept])
+  const group = newGroup('업무')
+  const grouped = { ...note('그룹 메모', 6), group: group.id }
+  assert.deepEqual(parseBackup(backupJson([kept, grouped, note('')], [group])), { notes: [kept, grouped], groups: [group] })
+})
+
+test('그룹이 없던 백업은 기본 그룹으로 읽는다', () => {
+  const { group, ...old } = note('예전 메모')
+  assert.deepEqual(parseBackup(JSON.stringify({ notes: [old] })), { notes: [{ ...old, group: '' }], groups: [] })
+  assert.throws(() => parseBackup(JSON.stringify({ notes: [old], groups: [{ id: '', name: '기본' }] })))
+  assert.throws(() => parseBackup(JSON.stringify({ notes: [{ ...old, group: 1 }] })))
+})
+
+test('그룹을 고르면 그 그룹의 메모만 보인다', () => {
+  const notes = [{ ...note('a', 1), group: 'g' }, note('b', 2)]
+  assert.deepEqual(visibleNotes(notes, '', 'all', 'g').map((n) => n.text), ['a'])
+  assert.deepEqual(visibleNotes(notes, '', 'all', '').map((n) => n.text), ['b'])
+  assert.equal(visibleNotes(notes, '').length, 2)
+})
+
+test('없는 그룹의 메모는 기본으로 옮기고 가져온 그룹은 기존 이름을 유지한다', () => {
+  const notes = [{ ...note('a'), group: 'gone' }, { ...note('b'), group: 'kept' }]
+  assert.deepEqual(ungroupOrphans(notes, [{ id: 'kept', name: 'k' }]).map((n) => n.group), ['', 'kept'])
+  const mine = [{ id: 'x', name: '내 이름' }]
+  assert.deepEqual(mergeGroups(mine, [{ id: 'x', name: '파일' }, { id: 'y', name: '새 그룹' }]), [...mine, { id: 'y', name: '새 그룹' }])
 })
 
 test('형식이 틀린 백업은 전체를 거부한다', () => {

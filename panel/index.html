@@ -36,7 +36,7 @@
       .settings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 
       .filter { display: flex; gap: 6px; flex: none; margin: 0 12px 10px; }
-      #scope, .search input {
+      select, .search input, #group-name {
         height: 30px;
         font: inherit;
         color: inherit;
@@ -44,14 +44,20 @@
         border: 1px solid var(--orca-input);
         border-radius: var(--radius);
       }
-      #scope { flex: none; padding: 0 4px; }
-      #scope option { color: var(--orca-popover-foreground); background: var(--orca-popover); }
+      select { flex: none; min-width: 0; padding: 0 4px; }
+      select option { color: var(--orca-popover-foreground); background: var(--orca-popover); }
       .search { position: relative; flex: 1; min-width: 0; }
       .search input { width: 100%; padding: 0 30px 0 10px; }
       .search input::placeholder { color: var(--orca-muted-foreground); }
       .search input::-webkit-search-cancel-button { display: none; }
       .search svg { position: absolute; top: 7px; right: 8px; color: var(--orca-muted-foreground); pointer-events: none; }
 
+      .groups { gap: 2px; margin: 0 12px 6px; }
+      #group { flex: 1; }
+      #group-edit { gap: 6px; margin: 0 12px 8px; }
+      #group-name { flex: 1; min-width: 0; padding: 0 8px; }
+      #group-edit button { height: 26px; padding: 0 10px; border-radius: var(--radius); color: var(--orca-secondary-foreground); background: var(--orca-secondary); }
+      #note-group { height: 26px; max-width: 50%; }
       .list-tools { justify-content: flex-end; gap: 2px; margin: -6px 12px 4px; }
 
       .cards { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -175,6 +181,23 @@
       <div id="settings" class="settings" hidden>
         <label><input id="confirm-setting" type="checkbox" /> 삭제하기 전에 확인</label>
       </div>
+      <div class="bar groups">
+        <select id="group" aria-label="그룹"></select>
+        <button id="group-add" class="icon" aria-label="새 그룹" title="새 그룹">
+          <svg viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /><path d="M10 9v5M7.5 11.5h5" /></svg>
+        </button>
+        <button id="group-rename" class="icon" aria-label="그룹 이름 바꾸기" title="그룹 이름 바꾸기">
+          <svg viewBox="0 0 20 20"><path d="M13.5 3.5l3 3L7 16H4v-3z" /></svg>
+        </button>
+        <button id="group-delete" class="icon" aria-label="그룹 삭제" title="그룹 삭제 (메모는 '기본' 그룹으로 옮겨집니다)">
+          <svg viewBox="0 0 20 20"><path d="M3.5 5.5h13M8 5.5V3.5h4v2m-7 0 .8 11h8.4l.8-11M8.5 8.5v5m3-5v5" /></svg>
+        </button>
+      </div>
+      <form id="group-edit" class="bar" hidden>
+        <input id="group-name" type="text" placeholder="그룹 이름" aria-label="그룹 이름" autocomplete="off" required />
+        <button type="submit">확인</button>
+        <button id="group-cancel" type="button">취소</button>
+      </form>
       <div class="filter">
         <select id="scope" aria-label="조회 조건">
           <option value="all">전체</option>
@@ -213,6 +236,7 @@
         <button id="back" class="icon" aria-label="메모 목록" title="메모 목록">
           <svg viewBox="0 0 20 20"><path d="M16 10H4m5-5-5 5 5 5" /></svg>
         </button>
+        <select id="note-group" aria-label="메모 그룹" title="메모 그룹"></select>
         <span class="spacer"></span>
         <button id="pin" class="icon" aria-label="고정" title="고정" aria-pressed="false">
           <svg viewBox="0 0 20 20"><path d="M7 3h6M8 3v5.500L5.500 12h9L12 8.500V3M10 12v5" /></svg>
@@ -270,7 +294,7 @@
 
     <script type="module">
       import { EMOJI_GROUPS } from './emoji-data.js'
-      import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
+      import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
 
       const $ = (id) => document.getElementById(id)
       const editor = $('editor')
@@ -303,6 +327,8 @@
       ]
 
       let notes = []
+      let groups = [] // { id, name }. 기본 그룹(id '')은 목록에 없다.
+      const ALL_GROUPS = '*' // 그룹 선택창의 '모든 그룹' 값
       let current = null
       let confirmDelete = true
       let recentEmojis = DEFAULT_EMOJIS
@@ -335,7 +361,8 @@
         saveTimer = null
         if (!loaded) return
         const snapshot = persistable(notes)
-        writes = writes.then(() => orca.storage.set('notes', snapshot)).then(
+        const groupSnapshot = [...groups]
+        writes = writes.then(() => Promise.all([orca.storage.set('notes', snapshot), orca.storage.set('groups', groupSnapshot)])).then(
           () => showError(null),
           () => {
             showError('저장하지 못했습니다. 잠시 후 다시 시도합니다.')
@@ -405,7 +432,7 @@
           const { status } = await orca.files.saveAs({
             suggestedName: `sticky-notes-${new Date().toLocaleDateString('sv')}.json`, // sv 로캘이 현지 날짜를 YYYY-MM-DD로 준다.
             mimeType: 'application/json',
-            data: backupJson(notes)
+            data: backupJson(notes, groups)
           })
           if (status === 'saved') showStatus(`메모 ${persistable(notes).length}개를 백업했습니다.`)
         } catch {
@@ -416,11 +443,14 @@
       async function importBackup(file) {
         showError(null)
         try {
-          const imported = parseBackup(await file.text()).map((note) => ({ ...note, html: cleanHtml(note.html) }))
+          const backup = parseBackup(await file.text())
+          const imported = backup.notes.map((note) => ({ ...note, html: cleanHtml(note.html) }))
           const merged = mergeNotes(notes, imported)
           const added = merged.filter((note) => !notes.includes(note)).length
-          notes = merged
+          groups = mergeGroups(groups, backup.groups)
+          notes = ungroupOrphans(merged, groups)
           flush()
+          renderGroups()
           renderList()
           showStatus(added ? `메모 ${added}개를 가져왔습니다.` : '새로 가져올 메모가 없습니다.')
         } catch {
@@ -506,7 +536,8 @@
 
       function renderList() {
         const query = $('query').value
-        const shown = visibleNotes(notes, query, $('scope').value)
+        const group = $('group').value
+        const shown = visibleNotes(notes, query, $('scope').value, group === ALL_GROUPS ? null : group)
         if (shown.length) {
           $('cards').replaceChildren(...shown.map(card))
           return
@@ -515,6 +546,62 @@
         empty.className = 'empty'
         empty.textContent = query.trim() ? '검색 결과가 없습니다.' : '메모가 없습니다. + 버튼으로 추가하세요.'
         $('cards').replaceChildren(empty)
+      }
+
+      function groupOptions(select, withAll) {
+        const options = [...(withAll ? [[ALL_GROUPS, '모든 그룹']] : []), ['', '기본'], ...groups.map((group) => [group.id, group.name])]
+        select.replaceChildren(...options.map(([value, name]) => new Option(name, value)))
+      }
+
+      // 선택한 그룹이 지워졌으면 모든 그룹을 보여 준다.
+      function renderGroups(selected = $('group').value) {
+        groupOptions($('group'), true)
+        $('group').value = selected
+        if ($('group').value !== selected) $('group').value = ALL_GROUPS
+        const fixed = $('group').value === ALL_GROUPS || $('group').value === ''
+        $('group-rename').disabled = fixed
+        $('group-delete').disabled = fixed
+      }
+
+      // 이름을 바꿀 그룹. null이면 새 그룹을 만든다.
+      let editingGroup = null
+
+      function editGroup(group) {
+        editingGroup = group
+        $('group-edit').hidden = false
+        $('group-name').value = group?.name ?? ''
+        $('group-name').focus()
+        $('group-name').select()
+      }
+
+      function closeGroupEdit() {
+        $('group-edit').hidden = true
+      }
+
+      function saveGroup() {
+        const name = $('group-name').value.trim()
+        if (!name) return
+        let selected = editingGroup?.id
+        if (editingGroup) editingGroup.name = name
+        else {
+          const group = newGroup(name)
+          groups.push(group)
+          selected = group.id
+        }
+        closeGroupEdit()
+        flush()
+        renderGroups(selected)
+        renderList()
+      }
+
+      function deleteGroup() {
+        const id = $('group').value
+        groups = groups.filter((group) => group.id !== id)
+        ungroupOrphans(notes, groups) // 메모는 지우지 않고 '기본'으로 옮긴다.
+        flush()
+        renderGroups('')
+        renderList()
+        showStatus("그룹을 삭제하고 메모를 '기본'으로 옮겼습니다.")
       }
 
       function renderSwatches() {
@@ -636,6 +723,8 @@
         current = note
         title.value = note.title
         editor.innerHTML = note.html
+        groupOptions($('note-group'), false)
+        $('note-group').value = note.group
         $('pin').setAttribute('aria-pressed', String(note.pinned))
         togglePalette(false)
         toggleEmojis(false)
@@ -673,19 +762,22 @@
       async function load() {
         showError(null)
         try {
-          const [stored, confirmSetting, recent, tone] = await Promise.all([
+          const [stored, storedGroups, confirmSetting, recent, tone] = await Promise.all([
             orca.storage.get('notes'),
+            orca.storage.get('groups'),
             orca.storage.get('confirmDelete'),
             orca.storage.get('recentEmojis'),
             orca.storage.get('emojiTone')
           ])
-          notes = Array.isArray(stored) ? withDefaults(stored) : []
+          groups = Array.isArray(storedGroups) ? storedGroups : []
+          notes = ungroupOrphans(Array.isArray(stored) ? withDefaults(stored) : [], groups)
           confirmDelete = confirmSetting ?? true
           recentEmojis = recent ?? DEFAULT_EMOJIS
           setEmojiTone(tone ?? 0)
           loaded = true
-          for (const id of ['add', 'backup', 'import']) $(id).disabled = false
+          for (const id of ['add', 'backup', 'import', 'group-add']) $(id).disabled = false
           $('confirm-setting').checked = confirmDelete
+          renderGroups()
           renderList()
         } catch {
           showError('메모를 불러오지 못했습니다.', load)
@@ -759,7 +851,7 @@
         emojiTarget.focus()
       })
 
-      for (const id of ['add', 'backup', 'import']) $(id).disabled = true
+      for (const id of ['add', 'backup', 'import', 'group-add']) $(id).disabled = true
       $('backup').addEventListener('click', backup)
       $('import').addEventListener('click', () => $('import-file').click())
       $('import-file').addEventListener('change', async (event) => {
@@ -767,7 +859,8 @@
         event.target.value = '' // 같은 파일을 다시 고를 수 있게 한다.
       })
       $('add').addEventListener('click', () => {
-        const note = newNote()
+        const group = $('group').value
+        const note = newNote(Date.now(), group === ALL_GROUPS ? '' : group)
         notes.push(note)
         openNote(note)
       })
@@ -799,6 +892,26 @@
       for (const name of ['mouseleave', 'click', 'scroll']) $('cards').addEventListener(name, hideTip)
       $('query').addEventListener('input', renderList)
       $('scope').addEventListener('change', renderList)
+      $('group').addEventListener('change', () => {
+        closeGroupEdit()
+        renderGroups()
+        renderList()
+      })
+      $('group-add').addEventListener('click', () => editGroup(null))
+      $('group-rename').addEventListener('click', () => editGroup(groups.find((group) => group.id === $('group').value)))
+      $('group-delete').addEventListener('click', deleteGroup)
+      $('group-edit').addEventListener('submit', (event) => {
+        event.preventDefault()
+        saveGroup()
+      })
+      $('group-cancel').addEventListener('click', closeGroupEdit)
+      $('group-name').addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeGroupEdit()
+      })
+      $('note-group').addEventListener('change', (event) => {
+        current.group = event.target.value
+        scheduleSave()
+      })
 
       $('back').addEventListener('click', closeNote)
       $('pin').addEventListener('click', () => {
