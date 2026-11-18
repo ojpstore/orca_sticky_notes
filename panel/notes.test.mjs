@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { EMOJI_GROUPS } from './emoji-data.js'
-import { backupJson, COLORS, DEFAULT_EMOJIS, formatDate, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
+import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
 
 const note = (text, updatedAt = 0) => ({ ...newNote(updatedAt), text })
 
@@ -67,11 +67,6 @@ test('검색이 원본 배열 순서를 바꾸지 않는다', () => {
   const notes = [note('a', 1), note('b', 2)]
   visibleNotes(notes, '')
   assert.deepEqual(notes.map((n) => n.updatedAt), [1, 2])
-})
-
-test('날짜는 항상 연월일과 시분을 표시한다', () => {
-  // 오전/AM 표기는 런타임의 ICU 데이터에 따라 달라서 검사하지 않는다.
-  assert.match(formatDate(new Date(2026, 10, 6, 9, 5).getTime(), 'ko-KR'), /^2026\. 11\. 6\. .+ 9:05$/)
 })
 
 test('백업을 다시 읽으면 빈 메모를 뺀 같은 메모가 나온다', () => {

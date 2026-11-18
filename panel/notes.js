@@ -57,15 +57,6 @@ function byPinThenDate(a, b) {
   return a.pinned ? b.createdAt - a.createdAt : b.updatedAt - a.updatedAt
 }
 
-export const formatDate = (timestamp, locale) =>
-  new Date(timestamp).toLocaleString(locale, {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  })
-
 const isNote = (note) =>
   typeof note?.id === 'string' &&
   typeof note.title === 'string' &&

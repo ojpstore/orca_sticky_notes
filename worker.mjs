@@ -90,7 +90,7 @@ const listTerminals = () =>
   })
 
 export default function activate(orca) {
-  orca.panels.handle('terminal.apply', async ({ text }) => {
+  orca.panels.handle('terminal.apply', async ({ text, run = true }) => {
     const context = await orca.host.call('workspace.readContext')
     if (!context) return { error: '열린 워크스페이스가 없습니다.' }
 
@@ -102,7 +102,7 @@ export default function activate(orca) {
     const target = terminals.find((terminal) => terminal.handle === terminalId)
     const { input, flattened } = terminalInput(text, Boolean(target?.agentIdentity))
     const send = async (text) => (await orca.host.call('terminal.sendText', { terminalId, text, enter: false })).accepted
-    if (!(await typeAndRun(send, input, !flattened))) return { error: '터미널이 입력을 받지 않았습니다.' }
+    if (!(await typeAndRun(send, input, run && !flattened))) return { error: '터미널이 입력을 받지 않았습니다.' }
     return { title: target?.title ?? '터미널', flattened }
   })
 }

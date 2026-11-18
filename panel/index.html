@@ -72,7 +72,6 @@
       .card-title[aria-expanded='true']::before { content: '▾'; }
       .card-pin { flex: none; width: 13px; height: 13px; margin-right: auto; color: var(--c); }
       .card-title .card-pin { display: inline-block; margin-right: 5px; vertical-align: -2px; }
-      .date { flex: none; font-size: 11px; color: var(--orca-muted-foreground); }
       .apply {
         flex: none;
         height: 22px;
@@ -271,7 +270,7 @@
 
     <script type="module">
       import { EMOJI_GROUPS } from './emoji-data.js'
-      import { backupJson, COLORS, DEFAULT_EMOJIS, formatDate, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
+      import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeNotes, newNote, parseBackup, persistable, pushRecent, visibleNotes, withDefaults } from './notes.js'
 
       const $ = (id) => document.getElementById(id)
       const editor = $('editor')
@@ -375,13 +374,15 @@
         tip.style.top = `${fitsBelow ? bottom + TIP_GAP_PX : Math.max(0, top - TIP_GAP_PX - tip.offsetHeight)}px`
       }
 
-      async function applyToTerminal(note, button) {
+      async function applyToTerminal(note, run, button) {
         button.disabled = true
         showError(null)
         try {
-          const result = await orca.plugin.request('terminal.apply', { text: note.text })
+          const result = await orca.plugin.request('terminal.apply', { text: note.text, run })
+          const merged = result.flattened ? ' 일반 셸의 여러 줄 메모라 한 줄로 합쳤습니다.' : ''
           if (result.error) showError(result.error)
-          else showStatus(result.flattened ? `'${result.title}'에 넣었습니다. 일반 셸의 여러 줄 메모라 한 줄로 합치고 실행하지 않았습니다.` : `'${result.title}'에서 실행했습니다.`)
+          else if (!run) showStatus(`'${result.title}'에 넣었습니다.${merged}`)
+          else showStatus(result.flattened ? `'${result.title}'에 넣었습니다.${merged} 실행하지 않았습니다.` : `'${result.title}'에서 실행했습니다.`)
         } catch (error) {
           showError(`터미널에 보내지 못했습니다. ${error?.message ?? error}`)
         }
@@ -447,10 +448,6 @@
         body.setAttribute('role', 'button')
         body.setAttribute('aria-label', (note.title || note.text).slice(0, 80))
 
-        const date = document.createElement('div')
-        date.className = 'date'
-        date.textContent = formatDate(note.updatedAt, orca.locale)
-
         const preview = document.createElement('div')
         preview.className = 'preview'
         preview.innerHTML = note.html // 붙여넣기와 끌어놓기를 일반 텍스트로 제한해서 편집기 서식만 들어 있다.
@@ -458,7 +455,6 @@
         const top = document.createElement('div')
         top.className = 'card-top'
         top.dataset.tip = note.text.trim() || note.title // 제목만 있는 메모는 보여줄 내용이 없다.
-        top.append(date)
 
         if (note.title.trim()) {
           const heading = document.createElement('div')
@@ -496,12 +492,14 @@
 
         // 제목만 있는 메모는 넣을 내용이 없다.
         if (note.text.trim()) {
-          const apply = document.createElement('button')
-          apply.className = 'apply'
-          apply.textContent = '적용'
-          apply.title = '활성 터미널에 메모 내용을 넣고 실행'
-          apply.addEventListener('click', () => applyToTerminal(note, apply))
-          top.append(apply)
+          for (const [label, tip, run] of [['적용', '활성 터미널 입력창에 메모 내용만 넣기', false], ['실행', '활성 터미널에 메모 내용을 넣고 실행', true]]) {
+            const button = document.createElement('button')
+            button.className = 'apply'
+            button.textContent = label
+            button.title = tip
+            button.addEventListener('click', () => applyToTerminal(note, run, button))
+            top.append(button)
+          }
         }
         return element
       }
@@ -791,7 +789,7 @@
         renderList()
       })
       $('cards').addEventListener('mouseover', (event) => {
-        // 적용 버튼에는 자체 툴팁이 있다.
+        // 적용·실행 버튼에는 자체 툴팁이 있다.
         const header = event.target.closest('.apply') ? null : event.target.closest('.card-top')
         if (header === tipHeader) return
         hideTip()
