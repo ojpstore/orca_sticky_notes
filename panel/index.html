@@ -52,8 +52,25 @@
       .search input::-webkit-search-cancel-button { display: none; }
       .search svg { position: absolute; top: 7px; right: 8px; color: var(--orca-muted-foreground); pointer-events: none; }
 
-      .groups { gap: 2px; margin: 0 12px 6px; }
-      #group { flex: 1; }
+      .groups { align-items: flex-start; gap: 2px; margin: 0 12px 6px; }
+      #group { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; padding-top: 2px; }
+      .tab {
+        max-width: 100%;
+        height: 24px;
+        padding: 0 10px;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--orca-muted-foreground);
+        border: 1px solid var(--orca-border);
+        border-radius: var(--radius);
+      }
+      .tab:hover { color: var(--orca-accent-foreground); background: var(--orca-accent); }
+      .tab[aria-pressed='true'] { color: var(--orca-primary-foreground); background: var(--orca-primary); border-color: var(--orca-primary); }
+      .tab.drop { outline: 2px dashed var(--orca-ring); outline-offset: 1px; }
+      .card[draggable='true'] { cursor: grab; }
+      .card.dragging { opacity: 0.5; }
       #group-edit { gap: 6px; margin: 0 12px 8px; }
       #group-name { flex: 1; min-width: 0; padding: 0 8px; }
       #group-edit button { height: 26px; padding: 0 10px; border-radius: var(--radius); color: var(--orca-secondary-foreground); background: var(--orca-secondary); }
@@ -126,9 +143,10 @@
       #swatches { gap: 8px; padding: 4px 12px 8px; }
       .swatch { width: 18px; height: 18px; padding: 0; background: var(--c); border-radius: 50%; }
       .swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--orca-background), 0 0 0 3px var(--orca-foreground); }
-      #confirm { gap: 6px; margin: 0 8px 6px; padding: 6px 8px 6px 10px; font-size: 12px; border: 1px solid var(--orca-border); border-radius: var(--radius); }
-      #confirm button { height: 24px; padding: 0 10px; border-radius: var(--radius); color: var(--orca-secondary-foreground); background: var(--orca-secondary); }
-      #confirm #confirm-yes { color: var(--orca-destructive-foreground); background: var(--orca-destructive); }
+      .confirm { gap: 6px; margin: 0 8px 6px; padding: 6px 8px 6px 10px; font-size: 12px; border: 1px solid var(--orca-border); border-radius: var(--radius); }
+      .confirm button { height: 24px; padding: 0 10px; border-radius: var(--radius); color: var(--orca-secondary-foreground); background: var(--orca-secondary); }
+      .confirm .danger { color: var(--orca-destructive-foreground); background: var(--orca-destructive); }
+      #group-confirm { margin: 0 12px 8px; }
       .title-row { gap: 2px; padding-right: 8px; border-bottom: 1px solid var(--orca-border); }
       #title {
         flex: 1;
@@ -182,7 +200,7 @@
         <label><input id="confirm-setting" type="checkbox" /> 삭제하기 전에 확인</label>
       </div>
       <div class="bar groups">
-        <select id="group" aria-label="그룹"></select>
+        <div id="group" role="group" aria-label="그룹 (메모를 끌어 놓으면 그 그룹으로 옮깁니다)"></div>
         <button id="group-add" class="icon" aria-label="새 그룹" title="새 그룹">
           <svg viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /><path d="M10 9v5M7.5 11.5h5" /></svg>
         </button>
@@ -198,6 +216,11 @@
         <button type="submit">확인</button>
         <button id="group-cancel" type="button">취소</button>
       </form>
+      <div id="group-confirm" class="bar confirm" role="alertdialog" aria-labelledby="group-confirm-text" hidden>
+        <span id="group-confirm-text" class="spacer"></span>
+        <button id="group-confirm-yes" class="danger">삭제</button>
+        <button id="group-confirm-no">취소</button>
+      </div>
       <div class="filter">
         <select id="scope" aria-label="조회 조건">
           <option value="all">전체</option>
@@ -249,9 +272,9 @@
         </button>
       </div>
       <div id="swatches" class="bar" hidden></div>
-      <div id="confirm" class="bar" hidden>
+      <div id="confirm" class="bar confirm" hidden>
         <span class="spacer">이 메모를 삭제할까요?</span>
-        <button id="confirm-yes">삭제</button>
+        <button id="confirm-yes" class="danger">삭제</button>
         <button id="confirm-no">취소</button>
       </div>
       <div class="bar title-row">
@@ -328,7 +351,9 @@
 
       let notes = []
       let groups = [] // { id, name }. 기본 그룹(id '')은 목록에 없다.
-      const ALL_GROUPS = '*' // 그룹 선택창의 '모든 그룹' 값
+      const ALL_GROUPS = '*' // '모든 그룹' 탭의 값
+      const NOTE_DRAG_TYPE = 'application/x-sticky-note-id'
+      let selectedGroup = ALL_GROUPS
       let current = null
       let confirmDelete = true
       let recentEmojis = DEFAULT_EMOJIS
@@ -470,6 +495,8 @@
       function card(note) {
         const element = document.createElement('div')
         element.className = 'card'
+        element.draggable = true
+        element.dataset.id = note.id
         element.style.setProperty('--c', COLORS[note.color])
 
         const body = document.createElement('div')
@@ -536,8 +563,7 @@
 
       function renderList() {
         const query = $('query').value
-        const group = $('group').value
-        const shown = visibleNotes(notes, query, $('scope').value, group === ALL_GROUPS ? null : group)
+        const shown = visibleNotes(notes, query, $('scope').value, selectedGroup === ALL_GROUPS ? null : selectedGroup)
         if (shown.length) {
           $('cards').replaceChildren(...shown.map(card))
           return
@@ -548,25 +574,46 @@
         $('cards').replaceChildren(empty)
       }
 
-      function groupOptions(select, withAll) {
-        const options = [...(withAll ? [[ALL_GROUPS, '모든 그룹']] : []), ['', '기본'], ...groups.map((group) => [group.id, group.name])]
-        select.replaceChildren(...options.map(([value, name]) => new Option(name, value)))
+      const groupEntries = (withAll) => [...(withAll ? [[ALL_GROUPS, '모든 그룹']] : []), ['', '기본'], ...groups.map((group) => [group.id, group.name])]
+
+      function groupOptions(select) {
+        select.replaceChildren(...groupEntries(false).map(([value, name]) => new Option(name, value)))
       }
 
       // 선택한 그룹이 지워졌으면 모든 그룹을 보여 준다.
-      function renderGroups(selected = $('group').value) {
-        groupOptions($('group'), true)
-        $('group').value = selected
-        if ($('group').value !== selected) $('group').value = ALL_GROUPS
-        const fixed = $('group').value === ALL_GROUPS || $('group').value === ''
+      function renderGroups(selected = selectedGroup) {
+        const entries = groupEntries(true)
+        selectedGroup = entries.some(([value]) => value === selected) ? selected : ALL_GROUPS
+        $('group').replaceChildren(
+          ...entries.map(([value, name]) => {
+            const tab = document.createElement('button')
+            tab.className = 'tab'
+            tab.dataset.group = value
+            tab.textContent = name
+            tab.title = name
+            tab.setAttribute('aria-pressed', String(value === selectedGroup))
+            return tab
+          })
+        )
+        const fixed = selectedGroup === ALL_GROUPS || selectedGroup === ''
         $('group-rename').disabled = fixed
         $('group-delete').disabled = fixed
+      }
+
+      function moveNote(id, group) {
+        const note = notes.find((candidate) => candidate.id === id)
+        if (!note || note.group === group) return
+        note.group = group
+        flush()
+        renderList()
+        showStatus(`'${groupEntries(false).find(([value]) => value === group)[1]}' 그룹으로 옮겼습니다.`)
       }
 
       // 이름을 바꿀 그룹. null이면 새 그룹을 만든다.
       let editingGroup = null
 
       function editGroup(group) {
+        $('group-confirm').hidden = true
         editingGroup = group
         $('group-edit').hidden = false
         $('group-name').value = group?.name ?? ''
@@ -574,8 +621,19 @@
         $('group-name').select()
       }
 
+      // 그룹 이름 입력줄과 삭제 확인줄을 함께 닫는다.
       function closeGroupEdit() {
         $('group-edit').hidden = true
+        $('group-confirm').hidden = true
+      }
+
+      function confirmDeleteGroup() {
+        closeGroupEdit()
+        const name = groups.find((group) => group.id === selectedGroup)?.name
+        const count = notes.filter((note) => note.group === selectedGroup).length
+        $('group-confirm-text').textContent = `'${name}' 그룹을 삭제할까요?${count ? ` 메모 ${count}개는 '기본'으로 옮겨집니다.` : ''}`
+        $('group-confirm').hidden = false
+        $('group-confirm-no').focus()
       }
 
       function saveGroup() {
@@ -595,7 +653,8 @@
       }
 
       function deleteGroup() {
-        const id = $('group').value
+        closeGroupEdit()
+        const id = selectedGroup
         groups = groups.filter((group) => group.id !== id)
         ungroupOrphans(notes, groups) // 메모는 지우지 않고 '기본'으로 옮긴다.
         flush()
@@ -723,7 +782,7 @@
         current = note
         title.value = note.title
         editor.innerHTML = note.html
-        groupOptions($('note-group'), false)
+        groupOptions($('note-group'))
         $('note-group').value = note.group
         $('pin').setAttribute('aria-pressed', String(note.pinned))
         togglePalette(false)
@@ -859,8 +918,7 @@
         event.target.value = '' // 같은 파일을 다시 고를 수 있게 한다.
       })
       $('add').addEventListener('click', () => {
-        const group = $('group').value
-        const note = newNote(Date.now(), group === ALL_GROUPS ? '' : group)
+        const note = newNote(Date.now(), selectedGroup === ALL_GROUPS ? '' : selectedGroup)
         notes.push(note)
         openNote(note)
       })
@@ -892,14 +950,55 @@
       for (const name of ['mouseleave', 'click', 'scroll']) $('cards').addEventListener(name, hideTip)
       $('query').addEventListener('input', renderList)
       $('scope').addEventListener('change', renderList)
-      $('group').addEventListener('change', () => {
+      $('group').addEventListener('click', (event) => {
+        const tab = event.target.closest('.tab')
+        if (!tab) return
         closeGroupEdit()
-        renderGroups()
+        renderGroups(tab.dataset.group)
         renderList()
       })
+      // 메모 카드를 그룹 탭에 끌어 놓으면 그 그룹으로 옮긴다. '모든 그룹'은 놓을 곳이 아니다.
+      const dropTab = (event) => {
+        const tab = event.target.closest('.tab')
+        return tab && tab.dataset.group !== ALL_GROUPS && event.dataTransfer.types.includes(NOTE_DRAG_TYPE) ? tab : null
+      }
+      $('group').addEventListener('dragover', (event) => {
+        const tab = dropTab(event)
+        for (const other of $('group').children) other.classList.toggle('drop', other === tab)
+        if (!tab) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+      })
+      $('group').addEventListener('dragleave', (event) => {
+        if (!$('group').contains(event.relatedTarget)) for (const tab of $('group').children) tab.classList.remove('drop')
+      })
+      $('group').addEventListener('drop', (event) => {
+        const tab = dropTab(event)
+        for (const other of $('group').children) other.classList.remove('drop')
+        if (!tab) return
+        event.preventDefault()
+        moveNote(event.dataTransfer.getData(NOTE_DRAG_TYPE), tab.dataset.group)
+      })
+      $('cards').addEventListener('dragstart', (event) => {
+        const element = event.target.closest('.card')
+        if (!element) return
+        hideTip()
+        element.classList.add('dragging')
+        event.dataTransfer.setData(NOTE_DRAG_TYPE, element.dataset.id)
+        event.dataTransfer.effectAllowed = 'move'
+      })
+      $('cards').addEventListener('dragend', (event) => {
+        event.target.closest('.card')?.classList.remove('dragging')
+        for (const tab of $('group').children) tab.classList.remove('drop')
+      })
       $('group-add').addEventListener('click', () => editGroup(null))
-      $('group-rename').addEventListener('click', () => editGroup(groups.find((group) => group.id === $('group').value)))
-      $('group-delete').addEventListener('click', deleteGroup)
+      $('group-rename').addEventListener('click', () => editGroup(groups.find((group) => group.id === selectedGroup)))
+      $('group-delete').addEventListener('click', confirmDeleteGroup)
+      $('group-confirm-yes').addEventListener('click', deleteGroup)
+      $('group-confirm-no').addEventListener('click', closeGroupEdit)
+      $('group-confirm').addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeGroupEdit()
+      })
       $('group-edit').addEventListener('submit', (event) => {
         event.preventDefault()
         saveGroup()
