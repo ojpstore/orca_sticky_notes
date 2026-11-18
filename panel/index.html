@@ -144,9 +144,20 @@
       .swatch { width: 18px; height: 18px; padding: 0; background: var(--c); border-radius: 50%; }
       .swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--orca-background), 0 0 0 3px var(--orca-foreground); }
       .confirm { gap: 6px; margin: 0 8px 6px; padding: 6px 8px 6px 10px; font-size: 12px; border: 1px solid var(--orca-border); border-radius: var(--radius); }
-      .confirm button { height: 24px; padding: 0 10px; border-radius: var(--radius); color: var(--orca-secondary-foreground); background: var(--orca-secondary); }
-      .confirm .danger { color: var(--orca-destructive-foreground); background: var(--orca-destructive); }
-      #group-confirm { margin: 0 12px 8px; }
+      .confirm button, .dialog button { height: 24px; padding: 0 10px; border-radius: var(--radius); color: var(--orca-secondary-foreground); background: var(--orca-secondary); }
+      .confirm .danger, .dialog .danger { color: var(--orca-destructive-foreground); background: var(--orca-destructive); }
+      .dialog {
+        width: min(280px, calc(100vw - 32px));
+        padding: 14px 16px 12px;
+        color: var(--orca-popover-foreground);
+        background: var(--orca-popover);
+        border: 1px solid var(--orca-border);
+        border-radius: var(--radius);
+        box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+      }
+      .dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+      .dialog p { margin: 0 0 12px; overflow-wrap: anywhere; }
+      .dialog .bar { justify-content: flex-end; gap: 6px; }
       .title-row { gap: 2px; padding-right: 8px; border-bottom: 1px solid var(--orca-border); }
       #title {
         flex: 1;
@@ -216,11 +227,13 @@
         <button type="submit">확인</button>
         <button id="group-cancel" type="button">취소</button>
       </form>
-      <div id="group-confirm" class="bar confirm" role="alertdialog" aria-labelledby="group-confirm-text" hidden>
-        <span id="group-confirm-text" class="spacer"></span>
-        <button id="group-confirm-yes" class="danger">삭제</button>
-        <button id="group-confirm-no">취소</button>
-      </div>
+      <dialog id="group-confirm" class="dialog" role="alertdialog" aria-labelledby="group-confirm-text">
+        <p id="group-confirm-text"></p>
+        <div class="bar">
+          <button id="group-confirm-yes" class="danger">삭제</button>
+          <button id="group-confirm-no" autofocus>취소</button>
+        </div>
+      </dialog>
       <div class="filter">
         <select id="scope" aria-label="조회 조건">
           <option value="all">전체</option>
@@ -616,7 +629,6 @@
       let editingGroup = null
 
       function editGroup(group) {
-        $('group-confirm').hidden = true
         editingGroup = group
         $('group-edit').hidden = false
         $('group-name').value = group?.name ?? ''
@@ -624,10 +636,8 @@
         $('group-name').select()
       }
 
-      // 그룹 이름 입력줄과 삭제 확인줄을 함께 닫는다.
       function closeGroupEdit() {
         $('group-edit').hidden = true
-        $('group-confirm').hidden = true
       }
 
       function confirmDeleteGroup() {
@@ -635,8 +645,7 @@
         const name = groups.find((group) => group.id === selectedGroup)?.name
         const count = notes.filter((note) => note.group === selectedGroup).length
         $('group-confirm-text').textContent = `'${name}' 그룹을 삭제할까요?${count ? ` 메모 ${count}개는 '기본'으로 옮겨집니다.` : ''}`
-        $('group-confirm').hidden = false
-        $('group-confirm-no').focus()
+        $('group-confirm').showModal() // 실수로 Enter를 눌러도 지워지지 않게 취소에 포커스가 간다(autofocus).
       }
 
       function saveGroup() {
@@ -999,10 +1008,14 @@
       $('group-add').addEventListener('click', () => editGroup(null))
       $('group-rename').addEventListener('click', () => editGroup(groups.find((group) => group.id === selectedGroup)))
       $('group-delete').addEventListener('click', confirmDeleteGroup)
-      $('group-confirm-yes').addEventListener('click', deleteGroup)
-      $('group-confirm-no').addEventListener('click', closeGroupEdit)
-      $('group-confirm').addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') closeGroupEdit()
+      $('group-confirm-yes').addEventListener('click', () => {
+        $('group-confirm').close()
+        deleteGroup()
+      })
+      $('group-confirm-no').addEventListener('click', () => $('group-confirm').close())
+      // Esc는 dialog가 스스로 닫는다. 바깥 어두운 영역을 눌러도 취소한다.
+      $('group-confirm').addEventListener('click', (event) => {
+        if (event.target === $('group-confirm')) $('group-confirm').close()
       })
       $('group-edit').addEventListener('submit', (event) => {
         event.preventDefault()
