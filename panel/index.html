@@ -583,7 +583,10 @@
       // 선택한 그룹이 지워졌으면 모든 그룹을 보여 준다.
       function renderGroups(selected = selectedGroup) {
         const entries = groupEntries(true)
+        const previous = selectedGroup
         selectedGroup = entries.some(([value]) => value === selected) ? selected : ALL_GROUPS
+        // 패널을 다시 열면 마지막으로 보던 그룹을 보여 준다.
+        if (selectedGroup !== previous) orca.storage.set('selectedGroup', selectedGroup).catch(() => showError('설정을 저장하지 못했습니다.'))
         $('group').replaceChildren(
           ...entries.map(([value, name]) => {
             const tab = document.createElement('button')
@@ -821,17 +824,19 @@
       async function load() {
         showError(null)
         try {
-          const [stored, storedGroups, confirmSetting, recent, tone] = await Promise.all([
+          const [stored, storedGroups, confirmSetting, recent, tone, lastGroup] = await Promise.all([
             orca.storage.get('notes'),
             orca.storage.get('groups'),
             orca.storage.get('confirmDelete'),
             orca.storage.get('recentEmojis'),
-            orca.storage.get('emojiTone')
+            orca.storage.get('emojiTone'),
+            orca.storage.get('selectedGroup')
           ])
           groups = Array.isArray(storedGroups) ? storedGroups : []
           notes = ungroupOrphans(Array.isArray(stored) ? withDefaults(stored) : [], groups)
           confirmDelete = confirmSetting ?? true
           recentEmojis = recent ?? DEFAULT_EMOJIS
+          selectedGroup = lastGroup ?? ALL_GROUPS
           setEmojiTone(tone ?? 0)
           loaded = true
           for (const id of ['add', 'backup', 'import', 'group-add']) $(id).disabled = false
