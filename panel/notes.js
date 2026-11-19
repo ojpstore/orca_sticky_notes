@@ -56,14 +56,63 @@ const SEARCH_FIELDS = {
   text: (note) => note.text
 }
 
-// group이 null이면 모든 그룹의 메모를 보여 준다.
-export function visibleNotes(notes, query, scope = 'all', group = null) {
+// group이 null이면 모든 그룹, color가 null이면 모든 색상의 메모를 보여 준다.
+export function visibleNotes(notes, query, scope = 'all', group = null, color = null) {
   const needle = query.trim().toLocaleLowerCase()
   const field = SEARCH_FIELDS[scope]
   return notes
     .filter((note) => group === null || note.group === group)
+    .filter((note) => color === null || note.color === color)
     .filter((note) => field(note).toLocaleLowerCase().includes(needle))
     .sort(byPinThenDate)
+}
+
+export function duplicateNote(note, now = Date.now()) {
+  const { order, ...rest } = note
+  return {
+    ...rest,
+    id: newId(now),
+    title: note.title.trim() ? `${note.title} (복사본)` : '',
+    createdAt: now,
+    updatedAt: now
+  }
+}
+
+export function countByGroup(notes) {
+  const counts = { all: 0, '': 0 }
+  for (const note of persistable(notes)) {
+    counts.all += 1
+    counts[note.group] = (counts[note.group] ?? 0) + 1
+  }
+  return counts
+}
+
+export function reorderGroups(groups, ids) {
+  const byId = new Map(groups.map((group) => [group.id, group]))
+  const ordered = ids.map((id) => byId.get(id)).filter(Boolean)
+  const seen = new Set(ordered.map((group) => group.id))
+  return [...ordered, ...groups.filter((group) => !seen.has(group.id))]
+}
+
+const VAR_PATTERN = /\{\{([^{}]+)\}\}/g
+
+export function extractVars(text) {
+  const seen = new Set()
+  const vars = []
+  for (const [, raw] of text.matchAll(VAR_PATTERN)) {
+    const name = raw.trim()
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    vars.push(name)
+  }
+  return vars
+}
+
+export function fillVars(text, values) {
+  return text.replace(VAR_PATTERN, (match, raw) => {
+    const name = raw.trim()
+    return name && Object.hasOwn(values, name) ? values[name] : match
+  })
 }
 
 // 고정 메모가 항상 위에 오고 그 안에서는 작성일자 최신순, 나머지는 수정일자 최신순이다.
@@ -124,3 +173,20 @@ export const mergeGroups = (groups, imported) => [
   ...groups,
   ...imported.filter((group) => !groups.some((mine) => mine.id === group.id))
 ]
+
+// 다중 창 동시 편집 병합: 삭제 시각이 수정 시각보다 같거나 최신이면 지우고, 나머지는 최신 수정본을 남긴다.
+export function syncNotes(local, remote, deleted = {}) {
+  return mergeNotes(local, remote).filter((note) => !(deleted[note.id] >= note.updatedAt))
+}
+
+export function syncGroups(local, remote, deleted = {}) {
+  return mergeGroups(local, remote).filter((group) => !deleted[group.id])
+}
+
+export function pruneDeleted(deleted, now = Date.now(), maxAgeMs = 30 * 86400_000) {
+  const kept = {}
+  for (const [id, at] of Object.entries(deleted ?? {})) {
+    if (Number.isFinite(at) && now - at <= maxAgeMs) kept[id] = at
+  }
+  return kept
+}

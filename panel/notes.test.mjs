@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { EMOJI_GROUPS } from './emoji-data.js'
-import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, reorder, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
+import { backupJson, COLORS, countByGroup, DEFAULT_EMOJIS, duplicateNote, extractVars, fillVars, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pruneDeleted, pushRecent, reorder, reorderGroups, syncGroups, syncNotes, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
 
 const note = (text, updatedAt = 0) => ({ ...newNote(updatedAt), text })
 
@@ -159,4 +159,59 @@ test('검색 중에 바꾼 순서는 숨겨진 메모의 자리를 건드리지 
   const notes = [{ ...note('x', 3), id: 'a' }, { ...note('y', 2), id: 'hidden' }, { ...note('x', 1), id: 'c' }]
   reorder(notes, ['c', 'a'])
   assert.deepEqual(visibleNotes(notes, '').map((n) => n.id), ['c', 'hidden', 'a'])
+})
+
+test('색상 필터로 선택한 색상의 메모만 본다', () => {
+  const notes = [
+    { ...note('a', 1), color: 'yellow' },
+    { ...note('b', 2), color: 'blue' },
+    { ...note('c', 3), color: 'blue' }
+  ]
+  assert.deepEqual(visibleNotes(notes, '', 'all', null, 'blue').map((n) => n.text), ['c', 'b'])
+  assert.equal(visibleNotes(notes, '', 'all', null, 'pink').length, 0)
+  assert.equal(visibleNotes(notes, '', 'all', null, null).length, 3)
+})
+
+test('메모 복제는 새 id와 복사본 제목을 만들고 수동 순서는 비운다', () => {
+  const orig = { ...note('본문', 1), title: '원본', color: 'green', group: 'g1', order: 50 }
+  const copy = duplicateNote(orig, 100)
+  assert.notEqual(copy.id, orig.id)
+  assert.equal(copy.title, '원본 (복사본)')
+  assert.equal(copy.text, '본문')
+  assert.equal(copy.color, 'green')
+  assert.equal(copy.group, 'g1')
+  assert.equal(copy.order, undefined)
+  assert.equal(copy.createdAt, 100)
+  assert.equal(duplicateNote({ ...note('제목 없음', 1), title: '  ' }, 200).title, '')
+})
+
+test('그룹별 메모 개수는 빈 메모를 빼고 센다', () => {
+  const notes = [note('a'), { ...note('b'), group: 'g1' }, { ...note('c'), group: 'g1' }, note('')]
+  assert.deepEqual(countByGroup(notes), { all: 3, '': 1, g1: 2 })
+})
+
+test('그룹 탭 순서를 바꾸면 누락된 그룹도 뒤에 남긴다', () => {
+  const groups = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }]
+  assert.deepEqual(reorderGroups(groups, ['c', 'a']).map((g) => g.id), ['c', 'a', 'b'])
+})
+
+test('변수 추출과 치환은 중복을 없애고 순서를 지킨다', () => {
+  const template = 'git checkout -b {{ branch }} && echo {{branch}} {{ msg }} {{  }}'
+  assert.deepEqual(extractVars(template), ['branch', 'msg'])
+  assert.equal(fillVars(template, { branch: 'feat/x', msg: 'hi' }), 'git checkout -b feat/x && echo feat/x hi {{  }}')
+  assert.equal(fillVars('그대로 {{keep}}', {}), '그대로 {{keep}}')
+})
+
+test('다중 창 동기화는 최신 수정본과 삭제 기록을 함께 반영하고 복원을 허용한다', () => {
+  const a1 = { ...note('a-old', 1), id: 'a' }
+  const a2 = { ...note('a-new', 5), id: 'a' }
+  const deleted = { ...note('gone', 3), id: 'd' }
+  const restored = { ...note('back', 10), id: 'r' }
+  const synced = syncNotes([a1, restored], [a2, deleted], { d: 4, r: 5 })
+  assert.deepEqual(synced.map((n) => [n.id, n.text]), [['a', 'a-new'], ['r', 'back']])
+
+  const groups = syncGroups([{ id: 'g1', name: '로컬' }], [{ id: 'g2', name: '원격' }, { id: 'g3', name: '삭제됨' }], { g3: 10 })
+  assert.deepEqual(groups.map((g) => g.id), ['g1', 'g2'])
+
+  assert.deepEqual(pruneDeleted({ old: 100, fresh: 950 }, 1000, 100), { fresh: 950 })
 })

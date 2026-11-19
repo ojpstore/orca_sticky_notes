@@ -32,7 +32,7 @@
 
       .header { gap: 2px; padding: 8px 8px 8px 12px; }
       h1 { flex: 1; min-width: 0; margin: 0; font-size: 14px; font-weight: 600; }
-      .settings { margin: 0 12px 10px; padding: 8px 10px; font-size: 12px; border: 1px solid var(--orca-border); border-radius: var(--radius); }
+      .settings { margin: 0 12px 10px; padding: 8px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--orca-border); border-radius: var(--radius); }
       .settings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 
       .filter { display: flex; gap: 6px; flex: none; margin: 0 12px 10px; }
@@ -69,13 +69,22 @@
       .tab:hover { color: var(--orca-accent-foreground); background: var(--orca-accent); }
       .tab[aria-pressed='true'] { color: var(--orca-primary-foreground); background: var(--orca-primary); border-color: var(--orca-primary); }
       .tab.drop { outline: 2px dashed var(--orca-ring); outline-offset: 1px; }
+      .tab[draggable='true'] { cursor: grab; }
+      .tab.dragging { opacity: 0.5; }
+      .tab-count { margin-left: 4px; font-size: 11px; opacity: 0.72; }
       .card[draggable='true'] { cursor: grab; }
       .card.dragging { opacity: 0.5; }
       #group-edit { gap: 6px; margin: 0 12px 8px; }
       #group-name { flex: 1; min-width: 0; padding: 0 8px; }
       #group-edit button { height: 26px; padding: 0 10px; border-radius: var(--radius); color: var(--orca-secondary-foreground); background: var(--orca-secondary); }
       #note-group { height: 26px; max-width: 50%; }
-      .list-tools { justify-content: flex-end; gap: 2px; margin: -6px 12px 4px; }
+      .list-tools { justify-content: space-between; gap: 6px; margin: -4px 12px 6px; }
+      .color-filter { display: flex; align-items: center; gap: 5px; }
+      .color-dot { width: 13px; height: 13px; padding: 0; background: var(--c); border-radius: 50%; opacity: 0.7; }
+      .color-dot:hover { opacity: 1; }
+      .color-dot[aria-pressed='true'] { opacity: 1; box-shadow: 0 0 0 2px var(--orca-background), 0 0 0 3px var(--orca-foreground); }
+      .color-all { width: auto; height: 18px; padding: 0 6px; font-size: 11px; border-radius: var(--radius); color: var(--orca-muted-foreground); border: 1px solid var(--orca-border); background: none; opacity: 1; }
+      .color-all[aria-pressed='true'] { color: var(--orca-primary-foreground); background: var(--orca-primary); border-color: var(--orca-primary); box-shadow: none; }
 
       .cards { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
       .card {
@@ -108,13 +117,16 @@
       }
       .apply:hover:not(:disabled) { color: var(--orca-primary-foreground); background: var(--orca-primary); border-color: var(--orca-primary); }
       .apply:disabled { opacity: 0.6; cursor: default; }
+      .card-copy { width: 22px; height: 22px; padding: 0; }
+      .card-copy svg { width: 13px; height: 13px; }
       .card-top.divided + .card-body { border-top: 1px solid var(--orca-border); margin: 0 12px; padding: 8px 0 10px; }
       .card-body { min-height: 24px; padding: 0 12px 10px; cursor: pointer; } /* 제목만 있는 메모도 누를 영역이 남아야 한다. */
       .preview:empty { display: none; }
       .preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; color: var(--orca-muted-foreground); }
       .card-top:not(.divided) + .card-body .preview { color: inherit; }
       .empty { margin: 24px 0; text-align: center; color: var(--orca-muted-foreground); }
-      .status { flex: none; margin: 0; padding: 6px 12px; font-size: 12px; color: var(--orca-muted-foreground); border-top: 1px solid var(--orca-border); }
+      .status { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 6px 12px; font-size: 12px; color: var(--orca-muted-foreground); border-top: 1px solid var(--orca-border); }
+      #status-action { flex: none; color: var(--orca-primary); font-weight: 600; text-decoration: underline; }
       #tip {
         position: fixed;
         left: 0;
@@ -137,6 +149,38 @@
       .footer svg { width: 13px; height: 13px; }
 
       .preview ul, #editor ul { margin: 0; padding-left: 1.3em; }
+      .preview ul[data-checklist], #editor ul[data-checklist] { list-style: none; padding-left: 0; }
+      .preview ul[data-checklist] li, #editor ul[data-checklist] li { position: relative; padding-left: 20px; }
+      .preview ul[data-checklist] li::before, #editor ul[data-checklist] li::before {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 4px;
+        width: 12px;
+        height: 12px;
+        border: 1.5px solid var(--orca-muted-foreground);
+        border-radius: 3px;
+        box-sizing: border-box;
+        cursor: pointer;
+      }
+      .preview ul[data-checklist] li[data-checked='true'], #editor ul[data-checklist] li[data-checked='true'] {
+        text-decoration: line-through;
+        color: var(--orca-muted-foreground);
+      }
+      .preview ul[data-checklist] li[data-checked='true']::before, #editor ul[data-checklist] li[data-checked='true']::before {
+        content: '✓';
+        display: grid;
+        place-items: center;
+        font-size: 9px;
+        line-height: 1;
+        color: var(--orca-primary-foreground);
+        background: var(--orca-primary);
+        border-color: var(--orca-primary);
+      }
+      .var-fields { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 50vh; overflow-y: auto; }
+      .var-field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+      .var-field input { height: 28px; padding: 0 8px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--orca-input); border-radius: var(--radius); }
+      .dialog .primary { color: var(--orca-primary-foreground); background: var(--orca-primary); }
 
       #note { border-top: 2px solid var(--c); }
       #note > .bar:first-child { gap: 2px; padding: 6px 8px; }
@@ -209,6 +253,7 @@
       </div>
       <div id="settings" class="settings" hidden>
         <label><input id="confirm-setting" type="checkbox" /> 삭제하기 전에 확인</label>
+        <label><input id="remember-expanded" type="checkbox" /> 카드 펼침 상태 기억</label>
       </div>
       <div class="bar groups">
         <div id="group" role="group" aria-label="그룹 (메모를 끌어 놓으면 그 그룹으로 옮깁니다)"></div>
@@ -246,16 +291,27 @@
         </div>
       </div>
       <div class="bar list-tools">
-        <button id="collapse-all" class="icon" aria-label="전체 접기" title="전체 접기">
-          <svg viewBox="0 0 20 20"><path d="m6 3 4 4 4-4M6 17l4-4 4 4" /></svg>
-        </button>
-        <button id="expand-all" class="icon" aria-label="전체 펼치기" title="전체 펼치기">
+        <div id="color-filter" class="color-filter" role="group" aria-label="색상 필터"></div>
+        <button id="toggle-expand" class="icon" aria-label="전체 펼치기" title="전체 펼치기">
           <svg viewBox="0 0 20 20"><path d="m6 7 4-4 4 4M6 13l4 4 4-4" /></svg>
         </button>
       </div>
       <div id="cards" class="cards"></div>
       <div id="tip" role="tooltip" hidden></div>
-      <p id="status" class="status" role="status" hidden></p>
+      <div id="status" class="status" role="status" hidden>
+        <span id="status-text"></span>
+        <button id="status-action" hidden></button>
+      </div>
+      <dialog id="var-dialog" class="dialog" aria-labelledby="var-dialog-title">
+        <p id="var-dialog-title">변수 값을 입력하세요</p>
+        <form id="var-form">
+          <div id="var-fields" class="var-fields"></div>
+          <div class="bar">
+            <button type="submit" class="primary">확인</button>
+            <button id="var-cancel" type="button">취소</button>
+          </div>
+        </form>
+      </dialog>
       <div class="bar footer">
         <button id="backup" class="apply" title="메모를 JSON 파일로 저장">
           <svg viewBox="0 0 20 20"><path d="M10 3v12m-5-5 5 5 5-5" /></svg>백업
@@ -276,6 +332,9 @@
         <span class="spacer"></span>
         <button id="pin" class="icon" aria-label="고정" title="고정" aria-pressed="false">
           <svg viewBox="0 0 20 20"><path d="M7 3h6M8 3v5.500L5.500 12h9L12 8.500V3M10 12v5" /></svg>
+        </button>
+        <button id="duplicate" class="icon" aria-label="메모 복제" title="메모 복제 (Ctrl+D)">
+          <svg viewBox="0 0 20 20"><rect x="7" y="7" width="9" height="9" rx="1.5" /><path d="M5 13H4.5A1.5 1.5 0 0 1 3 11.5v-7A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5V5" /></svg>
         </button>
         <button id="palette" class="icon" aria-label="색상" title="색상" aria-expanded="false">
           <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" /><circle cx="10" cy="10" r="2.5" fill="currentColor" /></svg>
@@ -322,6 +381,9 @@
         <button class="icon" data-command="insertUnorderedList" aria-label="글머리 기호" aria-pressed="false" title="글머리 기호">
           <svg viewBox="0 0 20 20"><path d="M8 5h9M8 10h9M8 15h9M3.5 5h.01M3.5 10h.01M3.5 15h.01" stroke-width="2" /></svg>
         </button>
+        <button id="format-check" class="icon" aria-label="체크리스트" aria-pressed="false" title="체크리스트">
+          <svg viewBox="0 0 20 20"><rect x="3" y="4" width="4.5" height="4.5" rx="1" /><path d="m4.2 6.2 1 1 1.6-1.8M10 6.2h7" /><rect x="3" y="11.5" width="4.5" height="4.5" rx="1" /><path d="M10 13.8h7" /></svg>
+        </button>
         <button id="format-emoji" class="icon" aria-label="이모지" title="이모지" aria-expanded="false">
           <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" /><path d="M7 12c.7 1 1.7 1.5 3 1.5s2.300-.5 3-1.5M7.500 8h.01M12.500 8h.01" /></svg>
         </button>
@@ -330,7 +392,7 @@
 
     <script type="module">
       import { EMOJI_GROUPS } from './emoji-data.js'
-      import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, reorder, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
+      import { backupJson, COLORS, countByGroup, DEFAULT_EMOJIS, duplicateNote, extractVars, fillVars, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pruneDeleted, pushRecent, reorder, reorderGroups, syncGroups, syncNotes, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
 
       const $ = (id) => document.getElementById(id)
       const editor = $('editor')
@@ -364,11 +426,18 @@
 
       let notes = []
       let groups = [] // { id, name }. 기본 그룹(id '')은 목록에 없다.
+      let deletedNotes = {} // { [id]: deletedAt } 다중 창 동기화용 삭제 기록
+      let deletedGroups = {} // { [id]: deletedAt }
       const ALL_GROUPS = '*' // '모든 그룹' 탭의 값
       const NOTE_DRAG_TYPE = 'application/x-sticky-note-id'
+      const GROUP_DRAG_TYPE = 'application/x-sticky-group-id'
       let selectedGroup = ALL_GROUPS
+      let selectedColor = null
+      let lastDeleted = null // 삭제 직후 실행 취소용
+      const lastVarValues = {} // 변수 치환 직전 입력값 기억
       let current = null
       let confirmDelete = true
+      let rememberExpanded = false
       let recentEmojis = DEFAULT_EMOJIS
       let emojiTone = 0 // SKIN_TONES 위치. 0은 피부색 없는 기본 글자다.
       let emojiSections = [] // 처음 열 때 만든다. 글자 버튼이 2천 개 가까워서 메모만 보는 동안에는 만들지 않는다.
@@ -377,9 +446,10 @@
       let loaded = false // 불러오기 전에는 절대 저장하지 않는다. 빈 목록으로 덮어쓰면 메모가 사라진다.
       let saveTimer = null
       let statusTimer = null
+      let statusActionHandler = null
       let tipTimer = null
       let tipHeader = null
-      const expanded = new Set() // 펼친 메모 id. 저장하지 않으므로 패널을 새로 열면 모두 접힌다.
+      const expanded = new Set() // 펼친 메모 id
       let writes = Promise.resolve()
 
       function showError(message, retry) {
@@ -393,20 +463,97 @@
         banner.append(' ', button)
       }
 
-      // ponytail: 전체 배열을 한 키에 저장하며 마지막 쓰기가 이긴다. 패널을 두 창에서 동시에 열면 메모별 키와 onDidChange 병합이 필요하다.
+      const mergeDeleted = (a, b) => {
+        const merged = { ...a }
+        for (const [id, at] of Object.entries(b ?? {})) {
+          if (Number.isFinite(at)) merged[id] = Math.max(merged[id] ?? 0, at)
+        }
+        return pruneDeleted(merged)
+      }
+
+      // 저장 직전에 최신 스토리지와 병합해 다중 창 동시 편집 시 다른 창의 변경이 덮어쓰이지 않게 한다.
       function flush() {
         clearTimeout(saveTimer)
         saveTimer = null
         if (!loaded) return
-        const snapshot = persistable(notes)
-        const groupSnapshot = [...groups]
-        writes = writes.then(() => Promise.all([orca.storage.set('notes', snapshot), orca.storage.set('groups', groupSnapshot)])).then(
-          () => showError(null),
-          () => {
-            showError('저장하지 못했습니다. 잠시 후 다시 시도합니다.')
-            scheduleSave(RETRY_DELAY_MS)
+        const localNotes = persistable(notes)
+        const localGroups = [...groups]
+        const localDeletedNotes = { ...deletedNotes }
+        const localDeletedGroups = { ...deletedGroups }
+        writes = writes
+          .then(async () => {
+            const [remoteNotes, remoteGroups, remoteDeletedNotes, remoteDeletedGroups] = await Promise.all([
+              orca.storage.get('notes'),
+              orca.storage.get('groups'),
+              orca.storage.get('deletedNotes'),
+              orca.storage.get('deletedGroups')
+            ])
+            const mergedDeletedNotes = mergeDeleted(localDeletedNotes, remoteDeletedNotes)
+            const mergedDeletedGroups = mergeDeleted(localDeletedGroups, remoteDeletedGroups)
+            const mergedGroups = syncGroups(localGroups, Array.isArray(remoteGroups) ? remoteGroups : [], mergedDeletedGroups)
+            const mergedNotes = ungroupOrphans(
+              syncNotes(localNotes, Array.isArray(remoteNotes) ? withDefaults(remoteNotes) : [], mergedDeletedNotes),
+              mergedGroups
+            )
+            deletedNotes = mergedDeletedNotes
+            deletedGroups = mergedDeletedGroups
+            await Promise.all([
+              orca.storage.set('notes', mergedNotes),
+              orca.storage.set('groups', mergedGroups),
+              orca.storage.set('deletedNotes', mergedDeletedNotes),
+              orca.storage.set('deletedGroups', mergedDeletedGroups)
+            ])
+          })
+          .then(
+            () => showError(null),
+            () => {
+              showError('저장하지 못했습니다. 잠시 후 다시 시도합니다.')
+              scheduleSave(RETRY_DELAY_MS)
+            }
+          )
+      }
+
+      async function syncFromStorage() {
+        if (!loaded || saveTimer !== null) return
+        try {
+          const [remoteNotes, remoteGroups, remoteDeletedNotes, remoteDeletedGroups] = await Promise.all([
+            orca.storage.get('notes'),
+            orca.storage.get('groups'),
+            orca.storage.get('deletedNotes'),
+            orca.storage.get('deletedGroups')
+          ])
+          const nextDeletedNotes = mergeDeleted(deletedNotes, remoteDeletedNotes)
+          const nextDeletedGroups = mergeDeleted(deletedGroups, remoteDeletedGroups)
+          const nextGroups = syncGroups(groups, Array.isArray(remoteGroups) ? remoteGroups : [], nextDeletedGroups)
+          const nextNotes = ungroupOrphans(
+            syncNotes(notes, Array.isArray(remoteNotes) ? withDefaults(remoteNotes) : [], nextDeletedNotes),
+            nextGroups
+          )
+          deletedNotes = nextDeletedNotes
+          deletedGroups = nextDeletedGroups
+          const changed = JSON.stringify(notes) !== JSON.stringify(nextNotes) || JSON.stringify(groups) !== JSON.stringify(nextGroups)
+          if (!changed) return
+          notes = nextNotes
+          groups = nextGroups
+          if (current) {
+            const updated = notes.find((note) => note.id === current.id)
+            if (updated) {
+              const newer = updated.updatedAt > current.updatedAt
+              current = updated
+              if (newer) {
+                title.value = current.title
+                editor.innerHTML = current.html
+                $('note-group').value = current.group
+                $('pin').setAttribute('aria-pressed', String(current.pinned))
+                renderSwatches()
+              }
+            }
           }
-        )
+          renderGroups()
+          renderList()
+        } catch {
+          // 백그라운드 동기화 실패는 무시한다.
+        }
       }
 
       function scheduleSave(delay = SAVE_DELAY_MS) {
@@ -414,13 +561,23 @@
         saveTimer = setTimeout(flush, delay)
       }
 
-      function showStatus(message) {
+      function saveExpanded() {
+        if (!loaded || !rememberExpanded) return
+        orca.storage.set('expandedIds', [...expanded]).catch(() => showError('설정을 저장하지 못했습니다.'))
+      }
+
+      function showStatus(message, action = null, duration = action ? 6000 : STATUS_MS) {
         clearTimeout(statusTimer)
-        $('status').textContent = message
+        $('status-text').textContent = message
+        const button = $('status-action')
+        statusActionHandler = action?.onClick ?? null
+        button.textContent = action?.label ?? ''
+        button.hidden = !action
         $('status').hidden = false
         statusTimer = setTimeout(() => {
           $('status').hidden = true
-        }, STATUS_MS)
+          statusActionHandler = null
+        }, duration)
       }
 
       function hideTip() {
@@ -439,11 +596,103 @@
         tip.style.top = `${fitsBelow ? bottom + TIP_GAP_PX : Math.max(0, top - TIP_GAP_PX - tip.offsetHeight)}px`
       }
 
+      function resolveVars(text) {
+        const vars = extractVars(text)
+        if (!vars.length) return Promise.resolve(text)
+        const dialog = $('var-dialog')
+        const fields = $('var-fields')
+        fields.replaceChildren(
+          ...vars.map((name) => {
+            const label = document.createElement('label')
+            label.className = 'var-field'
+            label.textContent = name
+            const input = document.createElement('input')
+            input.type = 'text'
+            input.name = name
+            input.value = lastVarValues[name] ?? ''
+            input.autocomplete = 'off'
+            label.append(input)
+            return label
+          })
+        )
+        return new Promise((resolve) => {
+          const finish = (value) => {
+            $('var-form').removeEventListener('submit', onSubmit)
+            $('var-cancel').removeEventListener('click', onCancel)
+            dialog.removeEventListener('cancel', onCancel)
+            dialog.removeEventListener('click', onBackdrop)
+            resolve(value)
+          }
+          const onSubmit = (event) => {
+            event.preventDefault()
+            const values = {}
+            for (const input of fields.querySelectorAll('input')) {
+              values[input.name] = input.value
+              lastVarValues[input.name] = input.value
+            }
+            dialog.close()
+            finish(fillVars(text, values))
+          }
+          const onCancel = () => {
+            dialog.close()
+            finish(null)
+          }
+          const onBackdrop = (event) => {
+            if (event.target === dialog) onCancel()
+          }
+          $('var-form').addEventListener('submit', onSubmit)
+          $('var-cancel').addEventListener('click', onCancel)
+          dialog.addEventListener('cancel', onCancel)
+          dialog.addEventListener('click', onBackdrop)
+          dialog.showModal()
+          fields.querySelector('input')?.focus()
+          fields.querySelector('input')?.select()
+        })
+      }
+
+      async function copyText(text) {
+        if (navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(text)
+            return
+          } catch {
+            // 샌드박스 패널에서 Permissions-Policy로 막힐 수 있어 아래 폴백으로 진행한다.
+          }
+        }
+        const area = document.createElement('textarea')
+        area.value = text
+        area.setAttribute('readonly', '')
+        area.style.position = 'fixed'
+        area.style.opacity = '0'
+        document.body.append(area)
+        area.focus()
+        area.select()
+        area.setSelectionRange(0, text.length)
+        const copied = document.execCommand('copy')
+        area.remove()
+        if (copied) return
+        await orca.plugin.request('clipboard.write', { text })
+      }
+
+      async function copyNote(note) {
+        showError(null)
+        const resolved = await resolveVars(note.text)
+        if (resolved === null) return
+        try {
+          await copyText(resolved)
+          showStatus('클립보드에 복사했습니다.')
+        } catch {
+          showError('클립보드에 복사하지 못했습니다.')
+        }
+      }
+
       async function applyToTerminal(note, run, button) {
+        const resolved = await resolveVars(note.text)
+        if (resolved === null) return
         button.disabled = true
         showError(null)
         try {
-          const result = await orca.plugin.request('terminal.apply', { text: note.text, run })
+          const result = await orca.plugin.request('terminal.apply', { text: resolved, run })
           const merged = result.flattened ? ' 일반 셸의 여러 줄 메모라 한 줄로 합쳤습니다.' : ''
           if (result.error) showError(result.error)
           else if (!run) showStatus(`'${result.title}'에 넣었습니다.${merged}`)
@@ -454,11 +703,15 @@
         button.disabled = false
       }
 
-      // 메모 html은 innerHTML로 그려지고 패널 CSP는 인라인 스크립트를 허용한다. 파일에서 온 html은 편집기 서식만 남긴다.
+      // 메모 html은 innerHTML로 그려지고 패널 CSP는 인라인 스크립트를 허용한다. 파일에서 온 html은 편집기 서식과 체크리스트 속성만 남긴다.
       function cleanHtml(html) {
         const { body } = new DOMParser().parseFromString(html, 'text/html')
         for (const element of body.querySelectorAll('*')) {
+          const keepChecklist = element.tagName === 'UL' && element.hasAttribute('data-checklist')
+          const checkedValue = element.tagName === 'LI' ? element.getAttribute('data-checked') : null
           for (const { name } of [...element.attributes]) element.removeAttribute(name)
+          if (keepChecklist) element.setAttribute('data-checklist', '1')
+          if (checkedValue === 'true' || checkedValue === 'false') element.setAttribute('data-checked', checkedValue)
           if (!NOTE_TAGS.has(element.tagName)) element.replaceWith(...element.childNodes)
         }
         return body.innerHTML
@@ -521,6 +774,15 @@
         const preview = document.createElement('div')
         preview.className = 'preview'
         preview.innerHTML = note.html // 붙여넣기와 끌어놓기를 일반 텍스트로 제한해서 편집기 서식만 들어 있다.
+        preview.addEventListener('click', (event) => {
+          const item = event.target.closest('ul[data-checklist] li')
+          if (!item || event.clientX - item.getBoundingClientRect().left > 20) return
+          event.stopPropagation()
+          item.dataset.checked = item.dataset.checked === 'true' ? 'false' : 'true'
+          note.html = preview.innerHTML
+          note.updatedAt = Date.now()
+          scheduleSave()
+        })
 
         const top = document.createElement('div')
         top.className = 'card-top'
@@ -546,6 +808,8 @@
               const open = !expanded.delete(note.id)
               if (open) expanded.add(note.id)
               setOpen(open)
+              saveExpanded()
+              syncExpandToggle()
             })
           }
         }
@@ -562,6 +826,14 @@
 
         // 제목만 있는 메모는 넣을 내용이 없다.
         if (note.text.trim()) {
+          const copyButton = document.createElement('button')
+          copyButton.className = 'icon card-copy'
+          copyButton.title = '내용 복사'
+          copyButton.setAttribute('aria-label', '내용 복사')
+          copyButton.innerHTML = '<svg viewBox="0 0 20 20"><rect x="7" y="7" width="9" height="9" rx="1.5" /><path d="M5 13H4.5A1.5 1.5 0 0 1 3 11.5v-7A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5V5" /></svg>'
+          copyButton.addEventListener('click', () => copyNote(note))
+          top.append(copyButton)
+
           for (const [label, tip, run] of [['적용', '활성 터미널 입력창에 메모 내용만 넣기', false], ['실행', '활성 터미널에 메모 내용을 넣고 실행', true]]) {
             const button = document.createElement('button')
             button.className = 'apply'
@@ -574,16 +846,61 @@
         return element
       }
 
+      function renderColorFilter() {
+        const container = $('color-filter')
+        const all = document.createElement('button')
+        all.className = 'color-dot color-all'
+        all.textContent = '전체'
+        all.title = '모든 색상'
+        all.setAttribute('aria-pressed', String(selectedColor === null))
+        all.addEventListener('click', () => {
+          selectedColor = null
+          renderColorFilter()
+          renderList()
+        })
+        const dots = Object.entries(COLORS).map(([name, value]) => {
+          const dot = document.createElement('button')
+          dot.className = 'color-dot'
+          dot.style.setProperty('--c', value)
+          dot.title = `색상 필터: ${name}`
+          dot.setAttribute('aria-label', dot.title)
+          dot.setAttribute('aria-pressed', String(selectedColor === name))
+          dot.addEventListener('click', () => {
+            selectedColor = selectedColor === name ? null : name
+            renderColorFilter()
+            renderList()
+          })
+          return dot
+        })
+        container.replaceChildren(all, ...dots)
+      }
+
+      const EXPAND_ICON = 'm6 7 4-4 4 4M6 13l4 4 4-4'
+      const COLLAPSE_ICON = 'm6 3 4 4 4-4M6 17l4-4 4 4'
+
+      function syncExpandToggle(shown = visibleNotes(notes, $('query').value, $('scope').value, selectedGroup === ALL_GROUPS ? null : selectedGroup, selectedColor)) {
+        const collapsible = shown.filter((note) => note.title.trim() && note.text.trim())
+        const anyOpen = collapsible.some((note) => expanded.has(note.id))
+        const button = $('toggle-expand')
+        const label = anyOpen ? '전체 접기' : '전체 펼치기'
+        button.disabled = !collapsible.length
+        button.title = label
+        button.setAttribute('aria-label', label)
+        button.setAttribute('aria-pressed', String(anyOpen))
+        button.querySelector('path').setAttribute('d', anyOpen ? COLLAPSE_ICON : EXPAND_ICON)
+      }
+
       function renderList() {
         const query = $('query').value
-        const shown = visibleNotes(notes, query, $('scope').value, selectedGroup === ALL_GROUPS ? null : selectedGroup)
+        const shown = visibleNotes(notes, query, $('scope').value, selectedGroup === ALL_GROUPS ? null : selectedGroup, selectedColor)
+        syncExpandToggle(shown)
         if (shown.length) {
           $('cards').replaceChildren(...shown.map(card))
           return
         }
         const empty = document.createElement('p')
         empty.className = 'empty'
-        empty.textContent = query.trim() ? '검색 결과가 없습니다.' : '메모가 없습니다. + 버튼으로 추가하세요.'
+        empty.textContent = query.trim() || selectedColor ? '조건에 맞는 메모가 없습니다.' : '메모가 없습니다. + 버튼으로 추가하세요.'
         $('cards').replaceChildren(empty)
       }
 
@@ -596,6 +913,7 @@
       // 선택한 그룹이 지워졌으면 모든 그룹을 보여 준다.
       function renderGroups(selected = selectedGroup) {
         const entries = groupEntries(true)
+        const counts = countByGroup(notes)
         const previous = selectedGroup
         selectedGroup = entries.some(([value]) => value === selected) ? selected : ALL_GROUPS
         // 패널을 다시 열면 마지막으로 보던 그룹을 보여 준다.
@@ -605,8 +923,14 @@
             const tab = document.createElement('button')
             tab.className = 'tab'
             tab.dataset.group = value
+            tab.draggable = value !== ALL_GROUPS && value !== ''
+            const count = value === ALL_GROUPS ? counts.all : (counts[value] ?? 0)
             tab.textContent = name
-            tab.title = name
+            const badge = document.createElement('span')
+            badge.className = 'tab-count'
+            badge.textContent = String(count)
+            tab.append(badge)
+            tab.title = `${name} (${count})`
             tab.setAttribute('aria-pressed', String(value === selectedGroup))
             return tab
           })
@@ -620,7 +944,9 @@
         const note = notes.find((candidate) => candidate.id === id)
         if (!note || note.group === group) return
         note.group = group
+        note.updatedAt = Date.now()
         flush()
+        renderGroups()
         renderList()
         showStatus(`'${groupEntries(false).find(([value]) => value === group)[1]}' 그룹으로 옮겼습니다.`)
       }
@@ -667,6 +993,7 @@
       function deleteGroup() {
         closeGroupEdit()
         const id = selectedGroup
+        deletedGroups[id] = Date.now()
         groups = groups.filter((group) => group.id !== id)
         ungroupOrphans(notes, groups) // 메모는 지우지 않고 '기본'으로 옮긴다.
         flush()
@@ -812,14 +1139,79 @@
         current = null
         notes = persistable(notes)
         flush()
+        renderGroups()
         renderList()
         $('note').hidden = true
         $('list').hidden = false
       }
 
+      function undoDelete() {
+        if (!lastDeleted) return
+        const restored = { ...lastDeleted, updatedAt: Date.now() }
+        delete deletedNotes[restored.id]
+        lastDeleted = null
+        notes.push(restored)
+        flush()
+        renderGroups()
+        renderList()
+        showStatus('삭제를 취소했습니다.')
+      }
+
       function deleteCurrent() {
-        notes = notes.filter((note) => note !== current)
+        const removed = current
+        const hadContent = removed && persistable([removed]).length > 0
+        if (hadContent) {
+          deletedNotes[removed.id] = Date.now()
+          lastDeleted = { ...removed }
+        }
+        notes = notes.filter((note) => note !== removed)
         closeNote()
+        if (hadContent) showStatus('메모를 삭제했습니다.', { label: '실행 취소', onClick: undoDelete })
+      }
+
+      function duplicateCurrent() {
+        if (!current) return
+        const copy = duplicateNote(current)
+        notes.push(copy)
+        flush()
+        renderGroups()
+        openNote(copy)
+      }
+
+      function currentChecklist() {
+        const selection = getSelection()
+        if (!selection.rangeCount) return null
+        const node = selection.anchorNode
+        const element = node?.nodeType === 1 ? node : node?.parentElement
+        return element?.closest?.('#editor ul[data-checklist]') ?? null
+      }
+
+      function toggleChecklist() {
+        editor.focus()
+        const existing = currentChecklist()
+        if (existing) {
+          existing.removeAttribute('data-checklist')
+          for (const item of existing.querySelectorAll('li')) item.removeAttribute('data-checked')
+        } else {
+          const selection = getSelection()
+          const node = selection.anchorNode
+          const element = node?.nodeType === 1 ? node : node?.parentElement
+          let list = element?.closest?.('#editor ul')
+          if (!list) {
+            document.execCommand('insertUnorderedList')
+            const nextNode = getSelection().anchorNode
+            const nextElement = nextNode?.nodeType === 1 ? nextNode : nextNode?.parentElement
+            list = nextElement?.closest?.('#editor ul')
+          }
+          if (list) {
+            list.setAttribute('data-checklist', '1')
+            for (const item of list.querySelectorAll('li')) {
+              if (!item.hasAttribute('data-checked')) item.setAttribute('data-checked', 'false')
+            }
+          }
+        }
+        editor.dispatchEvent(new Event('input'))
+        syncFormatButtons()
       }
 
       function syncFormatButtons() {
@@ -828,30 +1220,48 @@
         for (const button of document.querySelectorAll('[data-command]')) {
           button.setAttribute('aria-pressed', String(inEditor && document.queryCommandState(button.dataset.command)))
         }
+        $('format-check').setAttribute('aria-pressed', String(inEditor && Boolean(currentChecklist())))
       }
 
       async function load() {
         showError(null)
         try {
-          const [stored, storedGroups, confirmSetting, recent, tone, lastGroup] = await Promise.all([
+          const [stored, storedGroups, storedDeletedNotes, storedDeletedGroups, confirmSetting, rememberSetting, storedExpanded, recent, tone, lastGroup] = await Promise.all([
             orca.storage.get('notes'),
             orca.storage.get('groups'),
+            orca.storage.get('deletedNotes'),
+            orca.storage.get('deletedGroups'),
             orca.storage.get('confirmDelete'),
+            orca.storage.get('rememberExpanded'),
+            orca.storage.get('expandedIds'),
             orca.storage.get('recentEmojis'),
             orca.storage.get('emojiTone'),
             orca.storage.get('selectedGroup')
           ])
-          groups = Array.isArray(storedGroups) ? storedGroups : []
-          notes = ungroupOrphans(Array.isArray(stored) ? withDefaults(stored) : [], groups)
+          deletedNotes = pruneDeleted(storedDeletedNotes)
+          deletedGroups = pruneDeleted(storedDeletedGroups)
+          groups = Array.isArray(storedGroups) ? storedGroups.filter((group) => !deletedGroups[group.id]) : []
+          notes = ungroupOrphans(
+            Array.isArray(stored) ? withDefaults(stored).filter((note) => !(deletedNotes[note.id] >= note.updatedAt)) : [],
+            groups
+          )
           confirmDelete = confirmSetting ?? true
+          rememberExpanded = rememberSetting ?? false
+          expanded.clear()
+          if (rememberExpanded && Array.isArray(storedExpanded)) {
+            for (const id of storedExpanded) expanded.add(id)
+          }
           recentEmojis = recent ?? DEFAULT_EMOJIS
           selectedGroup = lastGroup ?? ALL_GROUPS
           setEmojiTone(tone ?? 0)
           loaded = true
           for (const id of ['add', 'backup', 'import', 'group-add']) $(id).disabled = false
           $('confirm-setting').checked = confirmDelete
+          $('remember-expanded').checked = rememberExpanded
+          renderColorFilter()
           renderGroups()
           renderList()
+          orca.storage.onDidChange?.(() => void syncFromStorage())
         } catch {
           showError('메모를 불러오지 못했습니다.', load)
         }
@@ -865,6 +1275,7 @@
         swatch.setAttribute('aria-label', `색상 ${name}`)
         swatch.addEventListener('click', () => {
           current.color = name
+          current.updatedAt = Date.now()
           renderSwatches()
           scheduleSave()
         })
@@ -941,21 +1352,36 @@
         $('settings').hidden = !open
         $('gear').setAttribute('aria-expanded', String(open))
       })
+      $('status-action').addEventListener('click', () => {
+        const handler = statusActionHandler
+        statusActionHandler = null
+        $('status').hidden = true
+        handler?.()
+      })
       $('confirm-setting').addEventListener('change', (event) => {
         confirmDelete = event.target.checked
         orca.storage.set('confirmDelete', confirmDelete).catch(() => showError('설정을 저장하지 못했습니다.'))
       })
-      $('collapse-all').addEventListener('click', () => {
-        expanded.clear()
-        renderList()
+      $('remember-expanded').addEventListener('change', (event) => {
+        rememberExpanded = event.target.checked
+        orca.storage.set('rememberExpanded', rememberExpanded).catch(() => showError('설정을 저장하지 못했습니다.'))
+        orca.storage.set('expandedIds', rememberExpanded ? [...expanded] : []).catch(() => showError('설정을 저장하지 못했습니다.'))
       })
-      $('expand-all').addEventListener('click', () => {
-        for (const note of notes) expanded.add(note.id)
+      $('toggle-expand').addEventListener('click', () => {
+        const shown = visibleNotes(notes, $('query').value, $('scope').value, selectedGroup === ALL_GROUPS ? null : selectedGroup, selectedColor)
+        const collapsible = shown.filter((note) => note.title.trim() && note.text.trim())
+        const anyOpen = collapsible.some((note) => expanded.has(note.id))
+        if (anyOpen) {
+          for (const note of collapsible) expanded.delete(note.id)
+        } else {
+          for (const note of collapsible) expanded.add(note.id)
+        }
+        saveExpanded()
         renderList()
       })
       $('cards').addEventListener('mouseover', (event) => {
-        // 적용·실행 버튼에는 자체 툴팁이 있다.
-        const header = event.target.closest('.apply') ? null : event.target.closest('.card-top')
+        // 복사·적용·실행 버튼에는 자체 툴팁이 있다.
+        const header = event.target.closest('.apply, .card-copy') ? null : event.target.closest('.card-top')
         if (header === tipHeader) return
         hideTip()
         tipHeader = header
@@ -963,6 +1389,12 @@
       })
       for (const name of ['mouseleave', 'click', 'scroll']) $('cards').addEventListener(name, hideTip)
       $('query').addEventListener('input', renderList)
+      $('query').addEventListener('keydown', (event) => {
+        if (event.isComposing || event.key !== 'Escape') return
+        $('query').value = ''
+        renderList()
+        $('query').blur()
+      })
       $('scope').addEventListener('change', renderList)
       $('group').addEventListener('click', (event) => {
         const tab = event.target.closest('.tab')
@@ -971,12 +1403,33 @@
         renderGroups(tab.dataset.group)
         renderList()
       })
+      // 사용자 정의 그룹 탭끼리 끌어 순서를 바꾼다.
+      const isCustomTab = (tab) => tab && tab.dataset.group !== ALL_GROUPS && tab.dataset.group !== ''
+      $('group').addEventListener('dragstart', (event) => {
+        const tab = event.target.closest('.tab')
+        if (!isCustomTab(tab)) return
+        tab.classList.add('dragging')
+        event.dataTransfer.setData(GROUP_DRAG_TYPE, tab.dataset.group)
+        event.dataTransfer.effectAllowed = 'move'
+      })
       // 메모 카드를 그룹 탭에 끌어 놓으면 그 그룹으로 옮긴다. '모든 그룹'은 놓을 곳이 아니다.
       const dropTab = (event) => {
         const tab = event.target.closest('.tab')
         return tab && tab.dataset.group !== ALL_GROUPS && event.dataTransfer.types.includes(NOTE_DRAG_TYPE) ? tab : null
       }
       $('group').addEventListener('dragover', (event) => {
+        if (event.dataTransfer.types.includes(GROUP_DRAG_TYPE)) {
+          const dragging = $('group').querySelector('.tab.dragging')
+          const target = event.target.closest('.tab')
+          if (!dragging || !isCustomTab(target)) return
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'move'
+          if (target === dragging) return
+          const { left, width } = target.getBoundingClientRect()
+          if (event.clientX > left + width / 2) target.after(dragging)
+          else target.before(dragging)
+          return
+        }
         const tab = dropTab(event)
         for (const other of $('group').children) other.classList.toggle('drop', other === tab)
         if (!tab) return
@@ -987,11 +1440,24 @@
         if (!$('group').contains(event.relatedTarget)) for (const tab of $('group').children) tab.classList.remove('drop')
       })
       $('group').addEventListener('drop', (event) => {
+        if (event.dataTransfer.types.includes(GROUP_DRAG_TYPE)) {
+          const dragging = $('group').querySelector('.tab.dragging')
+          if (!dragging) return
+          event.preventDefault()
+          const ids = [...$('group').children].filter(isCustomTab).map((tab) => tab.dataset.group)
+          groups = reorderGroups(groups, ids)
+          flush()
+          renderGroups()
+          return
+        }
         const tab = dropTab(event)
         for (const other of $('group').children) other.classList.remove('drop')
         if (!tab) return
         event.preventDefault()
         moveNote(event.dataTransfer.getData(NOTE_DRAG_TYPE), tab.dataset.group)
+      })
+      $('group').addEventListener('dragend', () => {
+        renderGroups()
       })
       $('cards').addEventListener('dragstart', (event) => {
         const element = event.target.closest('.card')
@@ -1051,18 +1517,23 @@
       })
       $('note-group').addEventListener('change', (event) => {
         current.group = event.target.value
+        current.updatedAt = Date.now()
         scheduleSave()
       })
 
       $('back').addEventListener('click', closeNote)
       $('pin').addEventListener('click', () => {
         current.pinned = !current.pinned
+        current.updatedAt = Date.now()
         delete current.order // 끌어서 정한 순서는 고정 여부별 목록 안에서만 의미가 있다.
         $('pin').setAttribute('aria-pressed', String(current.pinned))
         scheduleSave()
       })
+      $('duplicate').addEventListener('click', duplicateCurrent)
       $('palette').addEventListener('click', () => togglePalette($('swatches').hidden))
       $('emoji').addEventListener('click', () => toggleEmojis($('emojis').hidden || emojiTarget !== title, title))
+      $('format-check').addEventListener('mousedown', (event) => event.preventDefault()) // 편집기 선택 영역 유지
+      $('format-check').addEventListener('click', toggleChecklist)
       $('format-emoji').addEventListener('mousedown', (event) => event.preventDefault()) // 편집기 선택 영역 유지
       $('format-emoji').addEventListener('click', () => toggleEmojis($('emojis').hidden || emojiTarget !== editor, editor))
       $('delete').addEventListener('click', () => {
@@ -1088,10 +1559,23 @@
       editor.addEventListener('input', () => {
         // 내용을 모두 지워도 브라우저가 <br>을 남겨서 안내 문구가 보이지 않는다.
         if (!editor.textContent && !editor.querySelector('li')) editor.innerHTML = ''
+        // 체크된 항목에서 Enter로 만든 새 빈 항목은 체크 해제 상태로 시작한다.
+        for (const item of editor.querySelectorAll('ul[data-checklist] li')) {
+          if (!item.hasAttribute('data-checked') || (item.dataset.checked === 'true' && !item.textContent.trim())) {
+            item.dataset.checked = 'false'
+          }
+        }
         current.html = editor.innerHTML
         current.text = editor.innerText
         current.updatedAt = Date.now()
         scheduleSave()
+      })
+      editor.addEventListener('click', (event) => {
+        const item = event.target.closest('ul[data-checklist] li')
+        if (!item || event.clientX - item.getBoundingClientRect().left > 20) return
+        event.preventDefault()
+        item.dataset.checked = item.dataset.checked === 'true' ? 'false' : 'true'
+        editor.dispatchEvent(new Event('input'))
       })
       editor.addEventListener('paste', (event) => {
         event.preventDefault()
@@ -1113,14 +1597,47 @@
       document.addEventListener('selectionchange', () => {
         if (current) syncFormatButtons()
       })
+      document.addEventListener('keydown', (event) => {
+        if (event.isComposing || document.querySelector('dialog[open]')) return
+        const mod = event.ctrlKey || event.metaKey
+        const key = event.key.toLowerCase()
+        if (!$('note').hidden) {
+          if (mod && key === 'd') {
+            event.preventDefault()
+            duplicateCurrent()
+          }
+          return
+        }
+        if (mod && (key === 'f' || key === 'k')) {
+          event.preventDefault()
+          $('query').focus()
+          $('query').select()
+          return
+        }
+        const active = document.activeElement
+        const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)
+        if (typing || mod || event.altKey) return
+        if (event.key === '/') {
+          event.preventDefault()
+          $('query').focus()
+        } else if (key === 'n' && !$('add').disabled) {
+          event.preventDefault()
+          $('add').click()
+        }
+      })
 
       // 패널이 닫힐 때 대기 중인 저장만 마친다. 변경이 없으면 쓰지 않아야 다른 곳의 저장을 덮어쓰지 않는다.
       const flushPending = () => {
         if (saveTimer !== null) flush()
       }
       addEventListener('pagehide', flushPending)
+      addEventListener('focus', () => {
+        if (!loaded) return
+        void syncFromStorage()
+      })
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) flushPending()
+        else if (loaded) void syncFromStorage()
       })
 
       void load()

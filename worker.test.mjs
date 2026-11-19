@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { activeTerminalId, cliResult, orcaCli, terminalInput, typeAndRun } from './worker.mjs'
+import { activeTerminalId, cliResult, clipboardCommand, orcaCli, terminalInput, typeAndRun } from './worker.mjs'
 
 test('셸에는 여러 줄을 한 줄로 합쳐서 실행되지 않게 한다', () => {
   assert.deepEqual(terminalInput('echo a\r\n\n  echo b\n', false), { input: ['echo a echo b'], flattened: true })
@@ -78,4 +78,10 @@ test('CLI가 stdout JSON으로 알린 실패 이유를 오류 메시지로 쓴�
   assert.throws(() => cliResult(failed, stdout), /Start the Orca app first\./)
   assert.throws(() => cliResult(failed, ''), /Command failed: orca/)
   assert.deepEqual(cliResult(null, JSON.stringify({ ok: true, result: { terminals: [] } })), { terminals: [] })
+})
+
+test('플랫폼에 맞는 클립보드 명령을 고른다', () => {
+  assert.equal(clipboardCommand('win32').file, 'powershell.exe')
+  assert.equal(clipboardCommand('darwin').file, 'pbcopy')
+  assert.equal(clipboardCommand('linux').file, 'wl-copy')
 })

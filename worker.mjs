@@ -99,7 +99,33 @@ const listTerminals = () =>
     )
   })
 
+export function clipboardCommand(platform = process.platform) {
+  if (platform === 'win32') {
+    return {
+      file: 'powershell.exe',
+      args: ['-NoProfile', '-NonInteractive', '-Command', '[Console]::InputEncoding = [System.Text.Encoding]::UTF8; Set-Clipboard -Value ([Console]::In.ReadToEnd())']
+    }
+  }
+  if (platform === 'darwin') return { file: 'pbcopy', args: [] }
+  return { file: 'wl-copy', args: [] }
+}
+
+const writeClipboard = (text) =>
+  new Promise((resolve, reject) => {
+    const { file, args } = clipboardCommand()
+    const child = execFile(file, args, { timeout: 5000, windowsHide: true }, (error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+    child.stdin.end(text, 'utf8')
+  })
+
 export default function activate(orca) {
+  orca.panels.handle('clipboard.write', async ({ text }) => {
+    await writeClipboard(String(text ?? ''))
+    return { ok: true }
+  })
+
   orca.panels.handle('terminal.apply', async ({ text, run = true }) => {
     const context = await orca.host.call('workspace.readContext')
     if (!context) return { error: '열린 워크스페이스가 없습니다.' }
