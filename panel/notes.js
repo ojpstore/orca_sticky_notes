@@ -67,9 +67,21 @@ export function visibleNotes(notes, query, scope = 'all', group = null) {
 }
 
 // 고정 메모가 항상 위에 오고 그 안에서는 작성일자 최신순, 나머지는 수정일자 최신순이다.
+// 끌어서 순서를 바꾼 메모는 order가 정렬 키를 대신해서 수정해도 자리를 지킨다.
+const sortKey = (note) => note.order ?? (note.pinned ? note.createdAt : note.updatedAt)
+
 function byPinThenDate(a, b) {
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-  return a.pinned ? b.createdAt - a.createdAt : b.updatedAt - a.updatedAt
+  return sortKey(b) - sortKey(a)
+}
+
+// ids는 화면에 보이는 순서대로 바꾼 메모들이다. 그 메모들이 쓰던 정렬 키를 새 순서대로 나눠 가지므로
+// 검색으로 숨겨진 메모와의 상대 위치는 그대로다. 새 메모는 지금 시각이 키라서 계속 맨 위에 온다.
+export function reorder(notes, ids) {
+  const moved = ids.map((id) => notes.find((note) => note.id === id))
+  const keys = moved.map(sortKey).sort((a, b) => b - a)
+  moved.forEach((note, index) => (note.order = keys[index]))
+  return notes
 }
 
 const isNote = (note) =>
@@ -80,6 +92,7 @@ const isNote = (note) =>
   typeof (note.group ?? '') === 'string' &&
   Object.hasOwn(COLORS, note.color) &&
   typeof note.pinned === 'boolean' &&
+  (note.order === undefined || Number.isFinite(note.order)) &&
   Number.isFinite(note.createdAt) &&
   Number.isFinite(note.updatedAt)
 

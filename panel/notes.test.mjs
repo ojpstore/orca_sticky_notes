@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { EMOJI_GROUPS } from './emoji-data.js'
-import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
+import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, reorder, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
 
 const note = (text, updatedAt = 0) => ({ ...newNote(updatedAt), text })
 
@@ -143,4 +143,20 @@ test('이모지를 한글 이름, 한글 태그, 영어로 찾는다', () => {
   assert.ok(found(' Thumbs ').includes('👍'))
   assert.deepEqual(found('없는검색어'), [])
   assert.equal(found('').length, allEmojis.length)
+})
+
+test('끌어서 바꾼 순서는 수정해도 유지되고 새 메모는 맨 위에 온다', () => {
+  const notes = [{ ...note('a', 3), id: 'a' }, { ...note('b', 2), id: 'b' }, { ...note('c', 1), id: 'c' }]
+  reorder(notes, ['c', 'a', 'b'])
+  assert.deepEqual(visibleNotes(notes, '').map((n) => n.id), ['c', 'a', 'b'])
+  notes[1].updatedAt = 99
+  assert.deepEqual(visibleNotes(notes, '').map((n) => n.id), ['c', 'a', 'b'])
+  notes.push({ ...note('d', 100), id: 'd' })
+  assert.deepEqual(visibleNotes(notes, '').map((n) => n.id), ['d', 'c', 'a', 'b'])
+})
+
+test('검색 중에 바꾼 순서는 숨겨진 메모의 자리를 건드리지 않는다', () => {
+  const notes = [{ ...note('x', 3), id: 'a' }, { ...note('y', 2), id: 'hidden' }, { ...note('x', 1), id: 'c' }]
+  reorder(notes, ['c', 'a'])
+  assert.deepEqual(visibleNotes(notes, '').map((n) => n.id), ['c', 'hidden', 'a'])
 })

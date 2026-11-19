@@ -330,7 +330,7 @@
 
     <script type="module">
       import { EMOJI_GROUPS } from './emoji-data.js'
-      import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
+      import { backupJson, COLORS, DEFAULT_EMOJIS, matchesEmoji, mergeGroups, mergeNotes, newGroup, newNote, parseBackup, persistable, pushRecent, reorder, ungroupOrphans, visibleNotes, withDefaults } from './notes.js'
 
       const $ = (id) => document.getElementById(id)
       const editor = $('editor')
@@ -1001,9 +1001,33 @@
         event.dataTransfer.setData(NOTE_DRAG_TYPE, element.dataset.id)
         event.dataTransfer.effectAllowed = 'move'
       })
-      $('cards').addEventListener('dragend', (event) => {
-        event.target.closest('.card')?.classList.remove('dragging')
+      // 같은 그룹, 같은 고정 여부의 메모끼리만 끌어서 순서를 바꾼다. 끄는 동안 카드를 옮겨 미리 보여 준다.
+      const noteOf = (element) => notes.find((note) => note.id === element.dataset.id)
+      const sameSection = (a, b) => a.group === b.group && a.pinned === b.pinned
+      $('cards').addEventListener('dragover', (event) => {
+        const dragging = $('cards').querySelector('.dragging')
+        const target = event.target.closest('.card')
+        if (!dragging || !target || !sameSection(noteOf(dragging), noteOf(target))) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+        if (target === dragging) return
+        const { top, height } = target.getBoundingClientRect()
+        if (event.clientY > top + height / 2) target.after(dragging)
+        else target.before(dragging)
+      })
+      $('cards').addEventListener('drop', (event) => {
+        const dragging = $('cards').querySelector('.dragging')
+        if (!dragging) return
+        event.preventDefault()
+        const note = noteOf(dragging)
+        const ids = [...$('cards').children].filter((element) => sameSection(noteOf(element), note)).map((element) => element.dataset.id)
+        reorder(notes, ids)
+        flush()
+      })
+      // 놓지 않고 취소했으면 미리 옮긴 카드를 되돌린다.
+      $('cards').addEventListener('dragend', () => {
         for (const tab of $('group').children) tab.classList.remove('drop')
+        renderList()
       })
       $('group-add').addEventListener('click', () => editGroup(null))
       $('group-rename').addEventListener('click', () => editGroup(groups.find((group) => group.id === selectedGroup)))
@@ -1033,6 +1057,7 @@
       $('back').addEventListener('click', closeNote)
       $('pin').addEventListener('click', () => {
         current.pinned = !current.pinned
+        delete current.order // 끌어서 정한 순서는 고정 여부별 목록 안에서만 의미가 있다.
         $('pin').setAttribute('aria-pressed', String(current.pinned))
         scheduleSave()
       })
